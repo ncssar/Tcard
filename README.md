@@ -23,6 +23,6 @@ A lot of gains could be made by computerizing the system.  Possibilities include
 - general reduction in paperwork (T-card team roster would be automatic)
 - and more...
 
-The main sticking point is that the computerized system must be ROBUST and BOMBPROOF.  These are humans we are trying to keep track of.  Losing the data is absolutely not an option, which is why the manual T-cards are so hard to beat.  Any work on computerizing the T-card system MUST address that topic right from the start.
+_The main sticking point is that the computerized system must be ROBUST and BOMBPROOF.  These are humans we are trying to keep track of.  Losing the data is absolutely not an option, which is why the manual T-cards are so hard to beat.  Any work on computerizing the T-card system MUST address that topic right from the start._
 
 So far we have an Excel spreadsheet for the sign-in process; just type in the SAR member# - the name is found in a lookup table and must be verified - then they are automatically signed in at the current time.  The spreadsheet has no macros, just formulas (some being order-dependent) so it can work in the Excel app on a smartphone.  The event sign-in sheet gets imported to a separate Excel spreadsheet with macros, which keeps track of all volunteer hours for all events, but cannot run in the Excel app so it has to be stored as a file online, downloaded, updated (via import), and posted back online.
