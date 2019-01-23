@@ -21,26 +21,7 @@ from datetime import date, datetime
 import sqlite3
 import threading
 
-class AsyncCopy(threading.Thread): 
-
-	def __init__(self, infile, out): 
-
-		# calling superclass init 
-		threading.Thread.__init__(self) 
-		self.infile = infile 
-		self.out = out 
-
-	def run(self): 
-
-		f = open(self.infile, "r") 
-		json.load(temp)
-		f.close()
-		f = open(self.out+"\TEST.json", "w")
-		json.dump(temp,f)
-		f.close()
-
-		print("Finished background file copy", 
-								
+global DEBUG
 
 ####
 ##  possibly have a record # for members, searchers and teams records.  Be able to read/specify the number and 
@@ -122,13 +103,34 @@ class AsyncCopy(threading.Thread):
 ##         ## want to update record not create a new one
 ##         dbcsrch.execute("UPDATE search SET mnbr = ? WHERE last = ?",(member_pool,"member_pool"))       
 ##         c_srch.commit()
-global DEBUG
+
 
 DEBUG = 0
 fntNorm = QFont("Times", 14)
 fntSmall = QFont("Times", 10)
 fntBold = QFont("Times", 12, QtGui.QFont.Bold)
 fntField = QFont("Times", 16, QtGui.QFont.Bold)
+
+class AsyncCopy(threading.Thread): 
+
+	def __init__(self, infile, out): 
+
+		# calling superclass init 
+		threading.Thread.__init__(self) 
+		self.infile = infile 
+		self.out = out 
+
+	def run(self): 
+
+          f = open(self.infile, "r") 
+          temp = json.load(f)
+          f.close()
+          f = open(self.out+"\TEST.json", "w")
+          json.dump(temp,f)
+          f.close()
+
+          print("Finished background file copy")
+								
 
 
 #
