@@ -8,6 +8,7 @@ import csv
 from pathlib import Path
 import winsound
 import re
+import json
 from collections import deque   ## pronounced deck
 global DEBUG
 
@@ -94,14 +95,14 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         self.setupUi(self)          # This is defined in v1.py file automatically
         if (DEBUG == 1): print("main self: %s" % self)
         self.mm = self
-        self.xx2 = xx      ## appears xx is only used here
-        self.READIN = 0     ## set to determine if we have read MEMBERS yet
+        self.xx2 = xx           ## appears xx is only used here
+        self.xx2.READIN = 0     ## set to determine if we have read MEMBERS yet
         # It sets up layout and widgets that are defined
 
         self.pushButton.clicked.connect(self._addSrchr)  # When the ADD button is pressed
         self.pushButton_2.clicked.connect(self._rmSrchr)  # When the REMOVE button is pressed
         self.pushButton_undo.clicked.connect(self._undo)  # When the UNDO button is pressed
-        self.pushButton_readMem.clicked.connect(self._readMem)  # When the READ button is pressed
+        self.pushButton_readMem.clicked.connect(self._readMemb)  # When the READ button is pressed
         self.pushButton_teams.clicked.connect(self.listTeams) # When list teams pushed
         self.num9.clicked.connect(lambda: self.numbers(9)) # put numbers in SAR ID field
         self.num8.clicked.connect(lambda: self.numbers(8)) # put numbers in SAR ID field
@@ -126,6 +127,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         self.tableWidget.cellDoubleClicked.connect(self.cell_was_Dclicked)
         self.tableWidget2.cellClicked.connect(self.dialog_was_clicked)
         self.tableWidget3.cellClicked.connect(self.dialog_was_clicked2)
+        self.tableWidget4.cellClicked.connect(self.dialog_was_clicked3)        
         self.selected = 0  ## preset to nothing selected   NOT USED?
         self.setAcceptDrops(True)               ## do not pickup drag/drop if assoc with tableWidget
         self.tableWidget.setDragEnabled(True)   ## needs to refer to tablewWidget
@@ -341,73 +343,96 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         
 
         
-    def _readMem(self): ## Button READ MEMBERS from CVS files
-        ##zz = v1.tabinfo()
-        caps = ["EMT", "PA", "RN"]
-        zz = self.zz2
-        if (DEBUG == 1): print("At unlock %i\n" % self.modex)
-        self.modex = 1 - self.modex    ## change state
-        xmodel(self.modex)   # call routine outside of class
-        if (self.READIN == 0):  ## otherwise skip MEMBERS readin ...
-         zz.MEMBERS = []   ## reset list
-         self.READIN = 1   ## set as having been read
+    def _readMemb(self): ## Button READ MEMBERS from CVS files
+        ###  nominally the ncssar members.csv and OTHERS.csv files are read to get member info.
+        ####### FOR the case when the INFOX box starts with JSON, instead this is a recovery and
+        #######   the latest JSON files are read and populate TEAMS, SRCHR, UNAS_USED and MEMBERS
         
-         my_file = Path("MEMBERS2.csv")       #############  MAIN member database
-         if my_file.is_file():
-          with open('MEMBERS2.csv','rt') as csvIN:
-            csvPtr = csv.reader(csvIN, dialect='excel')
-            regShrf = r"[0-9][A-Z].*"        ## reg ex to find sheriff IDs
-            for row in csvPtr:
-               make = ["0", "0", "NC", "0", "0", "0", "0"]  ## need to re-initalize make here for some reason
-               if (row[0].isdigit()):        ## has to be all digits (searcher)
-                   make[1] = row[0]
-                   make[0] = row[1]
-                   for cx in caps:
+        caps = ["EMT", "PA", "RN"]  ##  capabilities for Medical type - probably temporary
+        yy = self.mm
+        zz = self.zz2
+        if (DEBUG == 1): print("At readmemb %i\n" % self.modex)
+        self.modex = 1 - self.modex    ## change state  test
+        xmodel(self.modex)   # call routine outside of class test
+        test_info = yy.infox.text()
+        if (test_info[0:4].upper() != "JSON"):  ## if INFOX has "JSON" means recovery
+          if (zz.READIN == 0):  ## otherwise skip MEMBERS readin ...
+             zz.MEMBERS = []          ## reset list
+             zz.READIN = 1      ## set as having been read
+                   
+             my_file = Path("MEMBERS2.csv")       #############  NCSSAR member database
+             if my_file.is_file():
+               with open('MEMBERS2.csv','rt') as csvIN:
+                 csvPtr = csv.reader(csvIN, dialect='excel')
+                 regShrf = r"[0-9][A-Z].*"        ## reg ex to find sheriff IDs
+                 for row in csvPtr:
+                   make = ["0", "0", "NC", "0", "0", "0", "0"]  ## need to re-initalize make here for some reason
+                   if (row[0].isdigit()):        ## has to be all digits (searcher)
+                     make[1] = row[0]
+                     make[0] = row[1]
+                     for cx in caps:
                        regcap = r"[ ,]" + cx + r"[ ,]"
                        fnd = re.search(regcap, row[5])
                        if (fnd != None):     ## found a match
                          make[4] = "1"   
-                   if (row[6] == "1"):       ## type 1 searcher; used for now to choose LEADER
+                     if (row[6] == "1"):       ## type 1 searcher; used for now to choose LEADER temporary
                        make[3] = "1"        
-               elif (re.search(regShrf, row[0]) != None):    ## numb/letter... found sheriff coord
-                   make[1] = row[0]
-                   make[0] = row[1]
-               else:
-                   continue                   ## valid entry not located - go to next line               
-               zz.MEMBERS.append(make)        ## load MEMBERS if valid entry
+                   elif (re.search(regShrf, row[0]) != None):    ## numb/letter... found sheriff coord
+                     make[1] = row[0]
+                     make[0] = row[1]
+                   else:
+                     continue                   ## valid entry not located - go to next line               
+                   zz.MEMBERS.append(make)        ## load MEMBERS if valid entry
                
-          if (DEBUG == 1): print("\n\n")
-          if (DEBUG == 1): print("READ: %s:%s"%(zz,self.zz2))
-         else:
-           winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty
-           return
-        
-         zz.SRCHR.clear()             ##  reset for now only first time thru
-         zz.SRCHR.append(["END"])     ## preset the first time thru
-        
-        my_file = Path("OTHERS.csv")
+               if (DEBUG == 1): print("\n\n")
+               if (DEBUG == 1): print("READ: %s:%s"%(zz,self.zz2))
+             else:
+               winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty
+               return
+                 
+             zz.SRCHR.clear()             ##  reset for now only first time thru
+             zz.SRCHR.append(["END"])     ## preset the first time thru
+            
+          my_file = Path("OTHERS.csv")
 
-##### Could check for existing ID and agency and replace upoin readin
+##### Could check for existing ID and agency and replace upon readin
 
-        ###  format of others is "Member,ID,agency,Leader,Medical,CheckedIn" add cell for SRCHR pntr
-        if my_file.is_file():
-          if (DEBUG == 1): print("In other")  
-          with open('OTHERS.csv','rt') as csvIN2:
-            csvPtr = csv.reader(csvIN2, dialect='excel')
-            for row in csvPtr:
-              row = [row[0],row[1],row[2],row[3],row[4],row[5], "0"]  ## add position for SRCHR pointer
-              ifnd = 0  
-              for ix in range(len(zz.MEMBERS)):          
-                if (row[1] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID,agency
+          ###  format of others is "Member,ID,agency,Leader,Medical,CheckedIn" add cell for SRCHR pntr
+          if my_file.is_file():
+            if (DEBUG == 1): print("In other")  
+            with open('OTHERS.csv','rt') as csvIN2:
+              csvPtr = csv.reader(csvIN2, dialect='excel')
+              for row in csvPtr:
+                row = [row[0],row[1],row[2],row[3],row[4],row[5], "0"]  ## add position for SRCHR pointer
+                ifnd = 0  
+                for ix in range(len(zz.MEMBERS)):          
+                  if (row[1] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID,agency
                     del zz.MEMBERS[ix]         ##    update entry
                     zz.MEMBERS.insert(ix,row)
                     ifnd = 1                   ## mark event
                     break                      ## done, so skip the rest
-              if (ifnd == 0):                  ##    add
-                zz.MEMBERS.append(row)         ## possibly change # and order of cells
-                if (DEBUG == 1): print("new row: %s" % row)  
+                if (ifnd == 0):                  ##    add
+                  zz.MEMBERS.append(row)         ## possibly change # and order of cells
+                  if (DEBUG == 1): print("new row: %s" % row)  
           ### ignore otherwise
-        if (DEBUG == 1): print("READ: %s"%zz.SRCHR)
+          if (DEBUG == 1): print("READ: %s"%zz.SRCHR)
+          
+        else:       ## read json files to load MEMBERS, TEAMS, SRCHR, UNAS_USED for recovery
+            if (DEBUG == 1): print("JSON found")
+            mtimeA = os.path.getmtime("DATA\saveUnasA.json")
+            mtimeB = os.path.getmtime("DATA\saveUnasB.json")
+            if (mtimeA > mtimeB):
+                setName = "A"   
+            else:
+                setName = "B"
+               ##   Newest save time.  If corrupted, then delete
+               ##   the set and use the other one
+            print("Set: %s"%setName)             
+            with open("DATA\saveAll"+setName+".json", 'r') as infile:  ## opens, reads, closes
+                [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM] = json.load(infile)   
+            print("Doing recovery reload...")    
+            zz.tabload(yy)    
+
 
     def numbers(self,n):  ## take the number buttons and fill SAR ID field
         strg1 = ["D", "E", "N", "P", "S", "T"]
@@ -434,8 +459,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         fts = open("teams.txt","wt+")  ## possibly delete file first (above)
         yy = self.mm
         zz = self.zz2
-        ## print(zz.TEAMS)
-        #ask = [[1,5], [3,4],[5,2]]
+
         Tsort = sorted(zz.TEAMS[0:-1],key=itemgetter(0))  ## ignore "end"        
         Ssort = sorted(zz.SRCHR[0:-1],key=itemgetter(3,4))
         tsStrt = 0
@@ -480,7 +504,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             self.selected = 0  # reset after 1 more click
             return
         if (QtWidgets.qApp.mouseButtons() & QtCore.Qt.LeftButton):
-            if (DEBUG == 1): print("RMB")
+            if (DEBUG == 1): print("LMB")
         self.selected = 1
         if (DEBUG == 1): print("Row %d and Column %d was clicked" % (row+1, column+1))
         item = self.tableWidget.item(row, column)  #  why not  itemAt(row, column)?
@@ -502,7 +526,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         ##  currentRow or currentColumn  itemAt gives item, not contents
         ##      using .text() will give the contents
 
-    def dialog_was_clicked(self, row, column): ## tableWidget2
+    def dialog_was_clicked(self, row, column): ## tableWidget2  RMB for Team
         ##
         if self.selected :         ## PROBABLY not used??
             self.selected = 0  # reset after 1 more click
@@ -517,27 +541,45 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         if (row == 3):
           self.tableWidget2.hide()
           if (column == 0):  ## Ok
-            if (self.tableWidget2.item(2,0).text() != "--"):
             ## change values in TEAMS (& re-display?)  (otherwise leave them alone)
               if (DEBUG == 1): print("FOUND: %s %s"% (self.tableWidget.fnd_team,self.tableWidget2.item(0,1).text()))
               self.zz2.TEAMS[self.tableWidget.fnd_team][0] = self.tableWidget2.item(0,1).text()
               self.zz2.TEAMS[self.tableWidget.fnd_team][4] = self.tableWidget2.item(1,1).text()
-              self.zz2.TEAMS[self.tableWidget.fnd_team][5] = self.tableWidget2.item(2,1).text()
-            else:   ###  SHOULD BE ABLE TO get rid of the following as now there is a separate routine......
-              ## ccm and rrm are from RMB   
-              if (DEBUG == 1): print("Groups: create team/group entry %i %i"%(self.tableWidget.rrm,self.tableWidget.ccm))
-              self.zz2.TEAMS.insert(self.zz2.TEAMS.index(["END"]),[self.tableWidget2.item(1,1).text(), \
-                    self.tableWidget.ccm, self.tableWidget.rrm, 0, self.tableWidget2.item(1,1).text(), "--", 0.0]) # insert prior to END                    
-            self.zz2.tabload(self.mm)
+              self.zz2.TEAMS[self.tableWidget.fnd_team][5] = self.tableWidget2.item(2,1).text()                    
+              self.zz2.tabload(self.mm)
 
-    def dialog_was_clicked2(self, row, column): ## tableWidget3
+    def dialog_was_clicked2(self, row, column): ## tableWidget3  RMB last column groups
         ##
         if (DEBUG == 1): print("Dialog3 GROUPS row: %i, column: %i"%(row, column))
         self.tableWidget3.hide()
-        self.zz2.TEAMS.insert(self.zz2.TEAMS.index(["END"]),[self.tableWidget3.item(column,row).text(), \
-                    self.tableWidget.ccm, self.tableWidget.rrm, 0, self.tableWidget3.item(column,row).text(), "--", 0.0]) # insert prior to END                    
+        self.zz2.TEAMS.insert(self.zz2.TEAMS.index(["END"]),[self.tableWidget3.item(row,column).text(), \
+                    self.tableWidget.ccm, self.tableWidget.rrm, 0, self.tableWidget3.item(row,column).text(), "--", 0.0]) # insert prior to END                    
         self.zz2.tabload(self.mm)
-            
+
+    def dialog_was_clicked3(self, row, column): ## tableWidget4  RMB out-of-bounds
+        ##
+        if self.selected :         ## PROBABLY not used??
+            self.selected = 0  # reset after 1 more click
+            return
+            self.selected = 1
+        item = self.tableWidget4.item(2,1)   ## just to set a value    
+        if (DEBUG == 1): print("DIALOG4 OUT-OF-Bounds Row %d and Column %d was clicked" % (row+1, column+1))
+        if (column == 0 or row == 3): item = self.tableWidget4.item(row, column)  #  why not  itemAt(row, column)?
+        if (DEBUG == 1):
+          if (item != None): print("Item is %s\n" % item.text())
+          else: print("*** Item was None ***")
+        if (row == 3):
+          self.tableWidget4.hide()
+          if (column == 0):  ## Ok
+            ## change values in TEAMS (& re-display?)  (otherwise leave them alone)
+              if (DEBUG == 1): print("Looking for SrchrId %s and Agency %s"%(findSrchrId,findAgncy))
+              self.zz2.findSrchrId = self.tableWidget4.item(1,1).text()
+              self.zz2.findAgncy = self.tableWidget4.item(2,1).text()
+              if (self.zz2.findAgncy == " "): self.zz2.findAgncy = "NC"   ## the default
+          else:              ## cancel
+              self.zz2.findSrchrId = "0"
+              self.zz2.findAgncy = " "
+          self.zz2.tabload(self.mm)    ## for Ok or Cancel update the maintable           
 
 #### end of TableApp class
 

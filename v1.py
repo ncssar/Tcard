@@ -18,96 +18,15 @@ import copy                    ## using deepcopy for copying complex lists
 import csv
 import json
 from datetime import date, datetime
-import sqlite3
 import threading
 
 global DEBUG
-
-####
-##  possibly have a record # for members, searchers and teams records.  Be able to read/specify the number and 
-##     re-access the record using the record #.  Sort of like the present ptr 
-##  maybe able to use key's (row and col) to find a record vs having to do for-loops to get a match
-
-
-##  c_pers = sqlite3.connect(r"\\Stevetab\users\steve\documents\python\personell.db")
-##
-##  ######
-##  ##      replace sqlite3.dll with one from litereplica-bin-win32.zip in downloads (vers 2.0+sqlite3.8)
-##  ###         sqlite3.dll is at c:\users\steve\appdata\local\programs\python\python36\DLLs or python36-32
-##  ##
-##  #########  does litereplica use port 1234?
-##
-##  #$#c_pers = sqlite3.connect(r"file:\\Stevetab\users\steve\documents\python\personell.db?replica=master&slave=tcp://192.168.1.80:1234")
-##  ##c_pers = sqlite3.connect(r"file:\\Stevetab\users\steve\documents\python\personell.db?replica=master&slave=tcp://127.0.0.1:1234") 
-##  ##                       
-  
-##  #c_pers = sqlite3.connect("personell.db")
-  
-##  c_srch = sqlite3.connect(r"\\Stevetab\users\steve\documents\python\search.db")
-##  c_team = sqlite3.connect(r"\\Stevetab\users\steve\documents\python\teams.db")
-
-##  if action == "init" :
-##    try:  
-##      c = c_pers.cursor()
-##    except sqlite3.Error as er:  
-##      print("Error initializing pers db cursor: %s\n" % er)
-##    return (c)
-
-##  # Create table                    
-##  elif action == "create" :
-##    mess = "Ok" 
-##    try:  
-##      c.execute('''CREATE TABLE persons (last text, first text, agency text, id text, capabilities text)''')
-##    except sqlite3.Error as er:  
-##      print("Error creating pers db: %s\n" % er)
-##      mess = "fail"
-##    ## message if fails
-##    return(mess)
-
-##  # Insert a row of data
-##  elif action == "add" :
-##    c.execute("INSERT INTO persons (last, first, agency, id, capabilities) VALUES (?,?,?,?,?)",(ch_es[1],ch_es[2],ch_es[0],ch_es[3],ch_es[4]))
-##    # Save (commit) the changes       
-##    c_pers.commit()
-##    ## message if fails ?
-##    mess = "Ok"    ## temporary for now
-
-##      dbcsrch.execute('''SELECT mnbr, team FROM search WHERE last = ? and first = ? and agency = ?''',(terms[0], terms[1], terms[2]))
-##      sel_mem = dbcsrch.fetchall()
-##      selm = str(sel_mem[0][0]).strip()  ##  this is the members: converts single item in tuple to str
-##      selt = str(sel_mem[0][1]).strip()  ##  this is the team number
-##      print("The member is: >%s< " % selm)
-##      dbcsrch.execute("UPDATE search SET team = 0 WHERE mnbr = ?", sel_mem[0])                 ## update searcher record as unassigned    
-##      c_srch.commit()
-
-##   dbcsrch.execute('''select last, first, agency, mnbr, caps from search where
-##                      team = 'Sheriff' and time_leave = 0''')
-##   rows = dbcsrch.fetchall() 
-
-##      dbcteam.execute("SELECT members FROM team WHERE team = ?",(teamx,)) 
-##      xx = dbcteam.fetchall()
-
-##      dbcteam.execute("SELECT leader, members FROM team WHERE team = ? and members LIKE ? ",(teamx,('%x'+str(selm[0])+'x%').strip())) ## remove team record
-##      xx = dbcteam.fetchall()
-
-##      ##########dbcteam.execute("DELETE FROM team WHERE leader = ? ",selm)             ## remove team record     
-##      c_team.commit()
-
-##       with c_srch :  ## reserve db while updating mnbr number
-##         dbcsrch.execute('''select mnbr from search where last = "member_pool"''')
-##         rows = dbcsrch.fetchall()
-##         if len(rows) == 0 : print("Member_pool  not found\n")
-##         else : print("mempool val: %s\n" % str(rows[0][0]))
-##         member_pool = int(rows[0][0])
-##         member_pool = member_pool + 1
-##         ## want to update record not create a new one
-##         dbcsrch.execute("UPDATE search SET mnbr = ? WHERE last = ?",(member_pool,"member_pool"))       
-##         c_srch.commit()
 
 
 DEBUG = 0
 fntNorm = QFont("Times", 14)
 fntSmall = QFont("Times", 10)
+fntSmall2 = QFont("Consolas", 9)
 fntBold = QFont("Times", 12, QtGui.QFont.Bold)
 fntField = QFont("Times", 16, QtGui.QFont.Bold)
 
@@ -125,7 +44,7 @@ class AsyncCopy(threading.Thread):
           f = open(self.infile, "r") 
           temp = json.load(f)
           f.close()
-          f = open(self.out+"\TEST.json", "w")
+          f = open(self.out, "w")
           json.dump(temp,f)
           f.close()
 
@@ -155,16 +74,17 @@ class PaintTable(QtWidgets.QTableWidget):
         if e.button() == QtCore.Qt.LeftButton:
             if (DEBUG == 1): print ('LMB')  ## processed later in dialog clicked routine
         if e.button() == QtCore.Qt.RightButton:
-            if (DEBUG == 1): print('Pressed RMB')
-            positionm = e.pos()
-            if (DEBUG == 1): print("Mouse Position %s pntr %s" % (positionm,self))
-            if (positionm.x() > 0 and positionm.x() < self.pntrtab.Wtable) :
-              indexm = self.pntrtab.tableWidget.indexAt(positionm)
-              self.rrm = indexm.row()
-              self.ccm = indexm.column()
+          if (DEBUG == 1): print('Pressed RMB')
+          positionm = e.pos()
+          if (DEBUG == 1): print("Mouse Position %s pntr %s" % (positionm,self))
+          if (positionm.x() > 0 and positionm.x() < self.pntrtab.Wtable) :
+            indexm = self.pntrtab.tableWidget.indexAt(positionm)
+            self.rrm = indexm.row()
+            self.ccm = indexm.column()
+            if (self.ccm >= 0 and self.rrm > 0):    ## on grided table
               self.fnd_team = tabinfo.fndloc(self, self.pntrtab.save_pntr.TEAMS, 2, 1, self.rrm, self.ccm) 
               if (DEBUG == 1): print("row %i column %i fnd %i" % (self.rrm, self.ccm, self.fnd_team))
-              if (self.fnd_team != -1):
+              if (self.fnd_team != -1):   ## pointing to a team
                 if (DEBUG == 1): print("Team name: %s, type: %s, location: %s"%(self.pntrtab.save_pntr.TEAMS[self.fnd_team][0], \
                         self.pntrtab.save_pntr.TEAMS[self.fnd_team][4],self.pntrtab.save_pntr.TEAMS[self.fnd_team][5]))
                 rx = (self.rrm+1)*50
@@ -178,16 +98,11 @@ class PaintTable(QtWidgets.QTableWidget):
                 for i in range(0,3):
                   iz0 = iz[i]  
                   item = QtWidgets.QTableWidgetItem(self.pntrtab.save_pntr.TEAMS[self.fnd_team][iz0])
-                  self.pntrtab.tableWidget2.setItem(i,1,item)                
-                item = QtWidgets.QTableWidgetItem("Name")      # need to set to orginal value
-                item.setFlags(Qt.ItemIsEnabled)
-                self.pntrtab.tableWidget2.setItem(0,0,item)  
-                item = QtWidgets.QTableWidgetItem("Location")  # need to set to orginal value
-                item.setFlags(Qt.ItemIsEnabled)
-                self.pntrtab.tableWidget2.setItem(2,0,item) 
+                  self.pntrtab.tableWidget2.setItem(i,1,item)
+                ## using tablewidget2
                 self.pntrtab.tableWidget2.show()
               elif (self.ccm >= self.pntrtab.Nunas_col and self.pntrtab.tableWidget.item(self.rrm,self.ccm).text() == " " \
-                          and self.ccm == self.pntrtab.Nsets-1):  ## presently only last column
+                          and self.ccm == self.pntrtab.Nsets-1):  ## presently only last column, and blank
               ## create a group <from list> (check to see if already exists)
                 if (DEBUG == 1): print("Found GROUP location")
                 cx = (self.ccm+1)*275
@@ -195,15 +110,16 @@ class PaintTable(QtWidgets.QTableWidget):
                 if (self.ccm > self.pntrtab.Nsets-3):
                   cx = (self.ccm-2)*275+100
                 if (self.rrm > self.pntrtab.Nrows-4):
-                  rx = (self.rrm-3)*50 
+                  rx = (self.rrm-3)*50
+                ## using tablewidget3  
                 self.pntrtab.tableWidget3.move(cx, rx)
-                #item = QtWidgets.QTableWidgetItem("--")
-                #item.setFlags(Qt.ItemIsEnabled)
-                #self.pntrtab.tableWidget2.setItem(0,0,item)  ## change items in list for Groups
-                #item = QtWidgets.QTableWidgetItem("--")
-                #item.setFlags(Qt.ItemIsEnabled)
-                #self.pntrtab.tableWidget2.setItem(2,0,item)  
                 self.pntrtab.tableWidget3.show()
+            else:      ## out-of-bounds ccm or rrm == -1
+              ## out-of-bounds RMB -> use for special table to do FIND or other function
+                    ##     Find searcher ID#, Agency Name, then change color or found names
+              self.pntrtab.tableWidget4.move(1000,1000)  # near center
+              self.pntrtab.tableWidget4.show() 
+              print("In out of bounds RMB")
         ## below, need QtWidgets.QTableWidget to set proper type for event     
         super(QtWidgets.QTableWidget,self).mousePressEvent(e)  ## allow rest of 'click' event to process
 
@@ -292,7 +208,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         self.tableWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget.horizontalHeader().hide()
         self.tableWidget.verticalHeader().hide()
-        ##  activated by RMB
+        ##  activated by RMB for Team header
         self.tableWidget2 = PaintTable(self.centralwidget)  ## secondary small table above primary table
         self.tableWidget2.setGeometry(QtCore.QRect(400, 520, 400, 250))
         self.tableWidget2.setRowCount(4)
@@ -301,7 +217,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         items = ("Name", "Type", "Location", "        Ok", "      Cancel")
         for i in range(0,5):
           item = QtWidgets.QTableWidgetItem(items[i])
-          item.setFlags(Qt.ItemIsEnabled)
+          item.setFlags(Qt.ItemIsEnabled)      # protected
           if (i < 4): self.tableWidget2.setItem(i,0,item)
           else:       self.tableWidget2.setItem(3,1,item)
         self.tableWidget2.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -318,13 +234,32 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         itemxs = ("K9", "Nordic", "SnowMobile", "allow choice?")
         for i in range(0,4):
           item = QtWidgets.QTableWidgetItem(itemxs[i])
-          item.setFlags(Qt.ItemIsEnabled)
+          item.setFlags(Qt.ItemIsEnabled)    # protected
           self.tableWidget3.setItem(i,0,item)
         self.tableWidget3.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget3.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget3.horizontalHeader().hide()
         self.tableWidget3.verticalHeader().hide()        
-        self.tableWidget3.hide()        
+        self.tableWidget3.hide()
+        ##  activated by RMB for out-of-bounds
+        self.tableWidget4 = PaintTable(self.centralwidget)  ## secondary small table above primary table
+        self.tableWidget4.setGeometry(QtCore.QRect(400, 520, 400, 250))
+        self.tableWidget4.setRowCount(4)
+        self.tableWidget4.setColumnCount(2)
+        self.tableWidget4.setObjectName("tableWidget2")
+        items = ("           Find", "SearcherID", "Agency", "        Ok", "      Cancel")
+        for i in range(0,5):
+          item = QtWidgets.QTableWidgetItem(items[i])
+          item.setFlags(Qt.ItemIsEnabled)     # protected
+          if (i < 4):
+            self.tableWidget4.setItem(i,0,item)
+            if (i < 3): self.tableWidget4.setItem(i,1,QtWidgets.QTableWidgetItem(" "))
+          else:       self.tableWidget4.setItem(3,1,item)
+        self.tableWidget4.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tableWidget4.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tableWidget4.horizontalHeader().hide()
+        self.tableWidget4.verticalHeader().hide()        
+        self.tableWidget4.hide()        
         #
         #
         item = QtWidgets.QTableWidgetItem()   ##  How to set all cells to a default font
@@ -548,10 +483,6 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
           #self.button.move(position)
           e.setDropAction(QtCore.Qt.CopyAction)  ## can affect the value at the orig loc
           if (DEBUG == 1): print("AT x placement error......")
-          ##$#    NOT SURE WHY this is necessary??  The "x" below seems to
-          ##$#        mess up stuff and better commented?
-        
-          ##$#    self.tableWidget.setItem(self.rr, self.cc, QtWidgets.QTableWidgetItem("X"))
           ## do not set color here
         else :
           e.ignore()
@@ -575,44 +506,18 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         self.Ninfo = 4
         self.chk_file = ""
         ##### SAVE FILE 
-        self.SAVE_FILE_PATH = "DATA\saveSEARCH"
+        self.SAVE_FILE_PATH = "DATA\saveSEARCH"   ## changing save to JSON
         savelen = 5
         self.saveSet = 0
+        self.READIN = 0
+        self.findSrchrId = "0"   ## initialize find function
+        self.findAgncy = " "
 
-####  DATABASE  SQLITE3
-########### Check to see if table file exists.  If so, connect, if not, connect, init and create
-####   member db should exist for NC, but may need to add members or have a table per agency
-####   searcher and team should be new per search??
-##        check function of connect (how does file get created?), cursor and execute CREATE TABLE; 
-##        can we create multiple tables in a file? (like a member table per agency or is that too hard to handle?)
-###########  May load member db in another program and just read in this program
-        print("Before")
-        ## appears connect creates the db if it does not exist; but Okay to run if already exists
-        c_member = sqlite3.connect(r"\\Stevetab\users\steve\documents\python\members.db")
-        try:                           # try to initialize; just appears to assoc cursor with file 
-          dbcmemb = c_member.cursor()
-        except sqlite3.Error as er:  
-          print("Error initializing pers db cursor: %s\n" % er)
-        try:                           # try to create table only if it does not exist 
-          dbcmemb.execute('''CREATE TABLE members (name text, agency text, id text, capabilities text)''')
-        except sqlite3.Error as er:    # can only create table once
-          print("Error creating members db: %s\n" % er)
-        print("After")  
-##        try:           # appears can create multiple tables in a db file
-##          dbcsrch.execute('''CREATE TABLE searchers (name text, agency text, id text, col int, row int, colt int, rowt int, capabilities text, time_in text, time_out text)''')
-##        except sqlite3.Error as er:  
-##          print("Error creating searchers db: %s\n" % er)
-##    try:  
-##      dbcteam.execute('''CREATE TABLE teams (team text, type text, loc text, colt int, rowt int)''')
-##    except sqlite3.Error as er:  
-##      print("Error creating teams db: %s\n" % er)
-
-        self.TEAMS = []  ## teams DB until sql DB is implemented
+        self.TEAMS = []  ## teams DB 
         self.saveTeam = deque([],savelen)
-        ##self.TEAMS = [[0 for x in range(self.NinfoTeam)] for y in range(self.Nteams)]
-        self.SRCHR = []  ## srchr DB until sql DB is implemented
+        self.SRCHR = []  ## srchr DB 
         self.saveSrchr = deque([],savelen)
-        self.MEMBERS = []   ##  All NC SAR and OTHERS members DB until sql is implemented
+        self.MEMBERS = []   ##  All NC SAR and OTHERS members 
         self.saveMembers = deque([],savelen)
         self.UNAS_USED = [0 for x in range(zz.Nrows*(Ui_MainWindow.Nsets-zz.Nunas_col))]  ## =1 if occupied; ptr = (col-Nunas_col)*Nrows + row
         self.saveUnUsed = deque([],savelen)
@@ -708,9 +613,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
               xxx.tableWidget.coordyp[xxx.tableWidget.inxt] = xxx.tableWidget.rowViewportPosition(rowy)
               xxx.tableWidget.inxt = xxx.tableWidget.inxt + 1
               if (colx > 0):
-                xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(text[0:21]+" "+ttype[0:3]+" "+tloc[0:3]))
+                xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(text[0:15]+" "+ttype[0:3]+" "+tloc[0:3]))
               else:
-                xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(text[0:21]))                  
+                xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(text[0:21]))  
               xxx.tableWidget.item(rowy, colx).setFont(fnt)
               xxx.tableWidget.item(rowy, colx).setForeground(color)
               if (colx >= Ui_MainWindow.Nunas_col and colx < zz.Nsets-1):    ## set used locations in unassigned
@@ -730,9 +635,11 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         while (text != "END"):
             rowy = self.SRCHR[self.lin][4] % zz.Nrows          
             colx = self.SRCHR[self.lin][3]         
-
-            fnt = fntSmall
+            fnt = fntSmall2
             color = QtCore.Qt.green
+            if ((self.SRCHR[self.lin][2] == self.findSrchrId or self.findSrchrId == " ") and self.SRCHR[self.lin][1] == self.findAgncy):
+              ##  match ID and AGNCY or just AGNCY if findID == 0      
+              color = QtCore.Qt.magenta
             if (self.SRCHR[self.lin][8] == "1"):   ## MED?
               xxx.tableWidget.coordxd[xxx.tableWidget.inxd] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyd[xxx.tableWidget.inxd] = xxx.tableWidget.rowViewportPosition(rowy)
@@ -742,11 +649,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
               xxx.tableWidget.coordxd[xxx.tableWidget.inxd] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyd[xxx.tableWidget.inxd] = xxx.tableWidget.rowViewportPosition(rowy)
               xxx.tableWidget.type[xxx.tableWidget.inxd] = 2
-              xxx.tableWidget.inxd = xxx.tableWidget.inxd + 1
-              
+              xxx.tableWidget.inxd = xxx.tableWidget.inxd + 1              
             if (self.ncol < zz.Nsets-1):  ## temporary check to make sure displayable column(not past last), if not, skip...
-
-              xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(text[0:20]+" "+self.SRCHR[self.lin][1]))
+              xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(f"{text[:13]:<13}"+" "+self.SRCHR[self.lin][1]))
               xxx.tableWidget.item(rowy, colx).setFont(fnt)
               xxx.tableWidget.item(rowy, colx).setForeground(color)
               if (colx >= Ui_MainWindow.Nunas_col and colx < zz.Nsets-1):   ## set used for locations in unassigned
@@ -756,42 +661,24 @@ class tabinfo(object):  ## table operations: tabload and tabmove
             text = self.SRCHR[self.lin][0]    ## next slot name to use
         #### end of SRCHR while
         
-          ## if member has special attributes set the color slots
-        istrt = self.nplace    ## NEEDED ?
-        icolEnd = zz.Nsets
-        
-        ### write out changes to file  CSV  BACKUP
-        #############    do we want to write each change OR once per Unit of Time like each minute if there
-        #############        was a change
-        save_file_name = str(datetime.now().time())[0:8]+".csv"
-        save_file = self.SAVE_FILE_PATH+save_file_name
-        if (DEBUG == 1): print("TIME: %s:%s"%(self.chk_file,save_file[0:20]))
-        save_file = save_file.replace(":","_")
-        if (self.chk_file != save_file_name[0:4]):
-          if (DEBUG == 1): print("File output")  
-          with open(save_file,'wt') as csvOUT:
-            csvPtr = csv.writer(csvOUT, dialect='excel')
-            csvPtr.writerows(self.TEAMS)
-            csvPtr.writerows(self.SRCHR)
-          self.chk_file = save_file_name[0:4]  ## comment out to save each change
 
-#### JSON write of data alternating to A and B filesets (in case one gets corrupted)        
+#### JSON write of data alternating to A and B filesets (in case one gets corrupted while writing)
+    ##   possibly will keep a save (with time stamp) every so-many minutes for history?      
         setName = "A"  
         if (self.saveSet == 0):
-            self.saveSet = 1
             setName = "B"
-        with open("DATA\saveTeam"+setName+".json", 'w') as outfile:
-            json.dump(self.TEAMS, outfile)
-        with open("DATA\saveSrchr"+setName+".json", 'w') as outfile:
-            json.dump(self.SRCHR, outfile)
-        with open("DATA\saveMemb"+setName+".json", 'w') as outfile:
-            json.dump(self.MEMBERS, outfile)
-        with open("DATA\saveUnas"+setName+".json", 'w') as outfile:
-            json.dump(self.UNAS_USED, outfile)
-        ## could have another thread started to copy the last file written to another machine
-        bg = AsyncCopy("DATA\saveSrchr"+setName+".json","DATA2")
-        bg.start()
-        ##bg.join()   ## would cause the main thread to wait              
+        self.saveSet = 1 - self.saveSet
+        if (self.READIN == 1):
+          print("SAVE files %i"%self.saveSet)
+          with open("DATA\saveAll"+setName+".json", 'w') as outfile:  ## opens, saves, closes
+            json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM], outfile) ## save TEAMS and TEAM_NUM
+          ## have another thread started to copy the last file written to another machine
+##
+#####      May want to add a periodic Keep set, say every 10min or so          
+##            
+          bg = AsyncCopy("DATA\saveAll"+setName+".json","DATA2\saveAll"+setName+".json")
+          bg.start()
+          ##bg.join()   ## would cause the main thread to wait              
 
    
     def fndloc(self, xlist, posr, posc, r, c):
@@ -803,20 +690,6 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         fnd = -1
         #print("FNDLOC %i %i %i %i %i" % (len(xlist),r,c,posr,posc))
         #for xxx in range(0,xlist.index(["END"])): print("xx %s %s" % (xlist[xxx], xlist[0][3]))
-
-##@
-##@  Using sqlite, could do a search in db team or searcher for match of row and col, then fetchall
-##@
-##@
-##@                  zz.SRCHR[srch_to[tt]][4] = rowt+tf+1+tt+1    ## put after the above  
-##@  For the above we would replace SRCHR list by the searcher db
-##@     we would access the 'srch_to' record and set the row value, by doing an UPDATE and then commit
-##@     'srch_to' is a list of ptr's to searchers; it would be a list of searcher record ptr's
-
-##@                for tt in range(0, zz.TEAMS[fnd_to_t][3]):
-##@                  zz.SRCHR[srch_to[tt]][4] = rowt+tf+1+tt+1    ## put after the above  
-##@  The above would be mechanized by doing a search for appropriate subset of searchers from a fetchall
-##@  then we would still loop thru N records in the searcher db and UPDATE the row field of each
 
         for t in range(0, xlist.index(["END"])):    ## stop prior to END
           #print(" %i,%i"%(xlist[t][posr],xlist[t][posc]))
@@ -833,17 +706,14 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         #  srch_list is the output list of searchers for this team
         #######  This routine assumes all searchers in a team are in one column
         ix = 0
-        srch_list = [0,0,0,0,0,0,0,0,0]  ## provides for max of 9 searchers in a team
+        srch_list = []
         ##xxx = self.SRCHR.index(["END"])+1
         ##print("END PLACE %i" % xxx)
 
-##@
-##@  Using sqlite, could do a search for all searchers that match team header row and col, then fetchall
-##@
         for s in range(0, self.SRCHR.index(["END"])):  #### STOP at "END"? try: self.SRCHR.index("END")+1
           #$#print("SRCH: %i,%i:%i,%i::%i,%i" %(t_row,t_col,self.SRCHR[s][6],self.SRCHR[s][5],self.SRCHR[s][4],self.SRCHR[s][3]))                                                 ##   OR self.SRCHR[0].index("END")+1
           if (t_row == self.SRCHR[s][6] and t_col == self.SRCHR[s][5]):
-            srch_list[self.SRCHR[s][4] - t_row - 1] = s  ## gives ordered list of searchers in the team
+            srch_list.append(s)     ## ordered list of searchers at this team    
             ix = ix + 1
         if (DEBUG == 1): print("TM_PTR: %i"%team_ptr)    
         if (ix != self.TEAMS[team_ptr][3]):
@@ -876,10 +746,6 @@ class tabinfo(object):  ## table operations: tabload and tabmove
             if (DEBUG == 1): print("FROM SRCHR HEAD")
             # find the team header, same col (unless unas), start at rowf and go up
             if (colf < ww.Nunas_col or colf == ww.Nsets-1):  ## not unas (normal team area OR Groups (last column))
-
-##@
-##@  Using sqlite, could search for team that has the indicated row and col, then fetchall
-##@
               for rx in range(rowf-1, 0, -1):  # look for team header
                   calc_from_t = tabinfo.fndloc(self, zz.TEAMS, 2, 1, rx, colf)  ## do we need to save rx?
                   if (calc_from_t != -1): break   # found
@@ -907,10 +773,6 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         elif (fnd_to_s != -1):
             if (DEBUG == 1): print("At fnd_to_s Ok")
             # find the team header, same col, start at rowt and go up
-
-##@
-##@  Using sqlite, could search teams db for matching row and col, then fetchall
-##@
             for rx in range(rowt-1, 0, -1):
                 calc_to_t = tabinfo.fndloc(self, zz.TEAMS, 2, 1, rx, colt)  ## do we need to save rx?
                 if (calc_to_t != -1): break   # found
@@ -1057,7 +919,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1  ## move up a row
 ## start  - alternative: COULD not allow taking one member of a team while in unas
                     elif (colf >= ww.Nunas_col and (zz.SRCHR[fnd_from_s][5] != ww.Nunas_col or \
-                          zz.SRCHR[fnd_from_s][6] != 1) and colf < ww.Nsets-1):  ## must be in unas and part of a team, but not Unassigned Team
+                          zz.SRCHR[fnd_from_s][6] != 1)):   ## must be in unas and part of a team, but not Unassigned Team
                       ## find TEAMS entry
                       if (DEBUG == 1): print("COLF: %i"%colf)  
                       ## calc_from_t2 is an alternative team pntr for the Unassigned area  
@@ -1073,25 +935,20 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1  ## move up a row
                       iz = (zz.SRCHR[srch_from[ixx]][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[srch_from[ixx]][4]
                       zz.UNAS_USED[iz] = 0                     ## set bottom-most entry to unused
-                      if (zz.TEAMS[calc_from_t2][3] == 1):     # cnt was 1, but removed, so get rid of team entry in Unassigned
-                        setDeleteTeam = 1
-                        #del zz.TEAMS[calc_from_t2]             # if last member to remove, disband from-team
-                        #iz = (zz.SRCHR[srch_from[ixx]][5] - ww.Nunas_col) * self.Nrows + zz.SRCHR[srch_from[ixx]][6]
-                        #zz.UNAS_USED[iz] = 0                     
-                      else:
-                        zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce from cnt by 1 
-                      if (DEBUG == 1): print("t2: %i %s"%(calc_from_t2,zz.TEAMS[calc_from_t2]))
-######  end of new area
-                    else:  ## from is individual entry (not part of a team)
-                      if (DEBUG == 1): print("Unassigned individual entry to a team")
+                      if (colf < ww.Nsets-1): ## Do not reduce cnt if in Groups; done below as normal team, not unassigned team
+                        if (zz.TEAMS[calc_from_t2][3] == 1):   # cnt was 1, but removed, so get rid of team entry in Unassigned
+                          setDeleteTeam = 1                    
+                        else:
+                          zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce FROM cnt by 1 
                       if (colf == ww.Nsets-1):    # from Groups column
                         typex = zz.TEAMS[calc_from_t][4]
                         zz.TEAMS[fnd_to_t][4] = typex        ## change TO team type (from Group)
+                      if (DEBUG == 1): print("t2: %i %s"%(calc_from_t2,zz.TEAMS[calc_from_t2]))
+                    else:  ## from is individual entry (not part of a team)
+                      if (DEBUG == 1): print("Unassigned individual entry to a team")                   
                     ## use srch_to to find order of searchers
                     ## now do changes to the TO team entries
-                    if (DEBUG == 1): print("XC: %i  %s"%  (fnd_to_t,zz.TEAMS[fnd_to_t]))
-### KINDA of an issue if delete TEAM or SRCHR and in the same transaction then work on
-###  a TEAM or SRCHR that is after the deleted item  SHOULD update fnd_to_t ? or do del after                    
+                    if (DEBUG == 1): print("XC: %i  %s"%  (fnd_to_t,zz.TEAMS[fnd_to_t]))                    
                     for ixx in range(0,zz.TEAMS[fnd_to_t][3]):       ## move to-searchers down by 1
                       #print("AT0e: %i,%i,%i"%(rowt,ixx,srch_to[ixx]))
                       #print("            %s"%zz.TEAMS[8])
@@ -1101,7 +958,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col): # only if in TEAM area
                       del zz.TEAMS[calc_from_t]   # if last member to remove, disband from-team
                     else:
-                        zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1  # reduce from cnt by 1   
+                        zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1  # reduce from cnt by 1
+                        iz = (zz.SRCHR[fnd_from_s][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[fnd_from_s][4]
+                        zz.UNAS_USED[iz] = 0
                     zz.SRCHR[fnd_from_s][4] = rowt+1  # add srchr to new team after team header, remove from from_team
                     zz.SRCHR[fnd_from_s][3] = colt
                     zz.SRCHR[fnd_from_s][5] = colt    # point to team entry
@@ -1124,10 +983,10 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           if (DEBUG == 1): print("AT0a: %i,%i,%i"%(rowf,ixx,srch_from[ixx]))    
                           zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1  ## move up a row                          
 ## start  - alternative: COULD not allow taking one member of a team while in unas
-                    ## the two addresses below are for the team (Unassigned) (not the srchr...) So, this is the area to get a srchr from a team
-                    ##                that is currently in the Unassigned area      
+                      ## the two addresses below are for the team (Unassigned) (not the srchr...) So, this is the area to get a srchr from a team
+                      ##                that is currently in the Unassigned area                         
                     elif (colf >= ww.Nunas_col and (zz.SRCHR[fnd_from_s][5] != ww.Nunas_col or \
-                          zz.SRCHR[fnd_from_s][6] != 1) and colf < ww.Nsets-1):  ## must be in unas and part of a team (but not Unassigned team)
+                          zz.SRCHR[fnd_from_s][6] != 1)):  ## must be in unas and part of a team (but not Unassigned team)
                       ## find TEAMS entry
                       calc_from_t2 = tabinfo.fndloc(self,zz.TEAMS,2,1,zz.SRCHR[fnd_from_s][6],zz.SRCHR[fnd_from_s][5])
                       srch_from = tabinfo.fnd_srchrs(zz,calc_from_t2,zz.SRCHR[fnd_from_s][6],zz.SRCHR[fnd_from_s][5])
@@ -1141,23 +1000,21 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1  ## move up a row
                       iz = (zz.SRCHR[srch_from[ixx]][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[srch_from[ixx]][4]
                       zz.UNAS_USED[iz] = 0                   ## set bottom-most entry to unused                          
-                      if (zz.TEAMS[calc_from_t2][3] == 1):   # CHECK for team in Unassigned area
-                        if (DEBUG == 1): print("Here???")  
-                        setDeleteTeam = 1
-                        #del zz.TEAMS[calc_from_t2]           # if last member to remove, disband from-team
-                        #iz = (zz.SRCHR[srch_from[ixx]][5] - ww.Nunas_col) * self.Nrows + zz.SRCHR[srch_from[ixx]][6]
-                        #zz.UNAS_USED[iz] = 0                                             
-                      else:
-                        zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce from cnt by 1
-                    else:
-                      if (DEBUG == 1): print("Unassigned individual entry to a searcher")
-                      if (colf == ww.Nsets-1):    # from Groups column
+                      if (colf < ww.Nsets-1):  ## Do not reduce cnt if in Groupsdone below; as normal team, not unassigned team
+                        if (zz.TEAMS[calc_from_t2][3] == 1):   # CHECK for team in Unassigned area  
+                          setDeleteTeam = 1                                           
+                        else:
+                          zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce FROM cnt by 1
+                      elif (colf == ww.Nsets-1):    # from Groups column
                         typex = zz.TEAMS[calc_from_t][4]
                         zz.TEAMS[calc_to_t][4] = typex        ## change TO team type (from Group)                      
+                    else:  ## moving an individual (not part of team) searcher from unassigned
+                      if (DEBUG == 1): print("Unassigned individual entry to searcher")
+                      iz = (zz.SRCHR[fnd_from_s][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[fnd_from_s][4]
+                      zz.UNAS_USED[iz] = 0                   ## set entry to unused
                     ## use srch_to to find insert position
                     m = 0
                     if (DEBUG == 1): print("CALC FROM-TO %i %i"% (calc_from_t, calc_to_t))
-      ### WEIRD              if (calc_from_t != calc_to_t or 1):    ## to fix indent issue, make it always happen
                     if (DEBUG == 1): print("XXXX %s: %s"%(zz.TEAMS[calc_to_t],zz.TEAMS[calc_from_t]))     
                     for ixx in range(0,zz.TEAMS[calc_to_t][3]):
                       if (DEBUG == 1): print("ATx: %i,%i,%i:%i"%(rowt,ixx,srch_to[ixx],zz.SRCHR[srch_to[ixx]][4]))
@@ -1170,10 +1027,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     zz.TEAMS[calc_to_t][3] = zz.TEAMS[calc_to_t][3]+1  ## add 1 to team
                     if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col): # only if in TEAM area
                         setDeleteTeam = 2
-                        #del zz.TEAMS[calc_from_t]   # if last member to remove, disband the from-team
+                        # if last member to remove, disband the from-team
                     else:
                         zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1  # reduce from cnt by 1
-      ### Un-indented end
                     ## below, add 1 to place the new srchr below the existing srchr    
                     zz.SRCHR[fnd_from_s][4] = rowt+1  # add srchr to new team (or within orig team) after srchr, remove from from_team
                     zz.SRCHR[fnd_from_s][3] = colt                          
@@ -1195,14 +1051,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     ##      colu = colu + self.Nunas_col   
                     ##
                     ####  will NEED to collapse from-team searchers                
-                    #$#zz.SRCHR[fnd_from_s][5] = zz.TEAMS[calc_to_t][1]   ## col - point to TO team entry
-                    #$#zz.SRCHR[fnd_from_s][6] = zz.TEAMS[calc_to_t][2]                   
-                    #$#zz.TEAMS[calc_to_t][3] = zz.TEAMS[calc_to_t][3]+1  ## add 1 to TO team (Unassigned in this case)
-#XXXXXXX
                     if (colf < ww.Nunas_col):        ## collapse from-team if in team area
                       if (DEBUG == 1): print("AT first branch")  
                       for ixx in range(0,zz.TEAMS[calc_from_t][3]):
-### CHECK
                         if (rowf < zz.SRCHR[srch_from[ixx]][4]):         ## move from-searchers up by 1                          
                           zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1   ## move up a row                                       
                       if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col): # only if in TEAM area
@@ -1231,10 +1082,11 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           zz.UNAS_USED[iz] = 0                                                                     
                         else:
                           zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce from cnt by 1
-######  end of new area
                     else:
                         if (DEBUG == 1): print("AT third branch")
-                        zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1    ## moved searcher (from unas)
+                        iz = (zz.SRCHR[fnd_from_s][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[fnd_from_s][4]
+                        zz.UNAS_USED[iz] = 0                   ## set bottom-most entry to unused             
+                        zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1    ## moved searcher (from unas)   
                     zz.SRCHR[fnd_from_s][4] = rowt  # add srchr to unas team, remove from from_team; do after above so as to not affect above search
                     zz.SRCHR[fnd_from_s][3] = colt
                     zz.SRCHR[fnd_from_s][5] = zz.TEAMS[calc_to_t][1]   ## col - point to TO team entry
@@ -1250,21 +1102,20 @@ class tabinfo(object):  ## table operations: tabload and tabmove
 
                     if (DEBUG == 1): print("AT going to NORM TEAM area .....")
                     if (colt == 0):       ## do not create in col 0
-                         winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty                    
+                         winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, do not create a team in col 0                    
                          if (DEBUG == 1): print("BEEP6")
                          return
                     elif (colt < ww.Nsets-1):   ## do not create a team in last column                     
                     ## CREATE team        ((( if from an existing team, need to collapse the from-team )))
                       if (DEBUG == 1): print("zz %i %i %i" % (zz.TEAM_NUM,colt,rowt))
                       zz.TEAM_NUM = zz.TEAM_NUM + 1
-                      typex = "GND"
+                      typex = "GND"   # default
                       if (colf == ww.Nsets-1):
                         typex = zz.TEAMS[calc_from_t][4]   # came from Groups, so use type                          
                       zz.TEAMS.insert(zz.TEAMS.index(["END"]),["TEAM "+str(zz.TEAM_NUM), colt, rowt, 1, typex, "IC", 0.0]) # insert prior to END
                       ##print("ALL TEAMS: %s"%zz.TEAMS)
                       if (colf < ww.Nunas_col):        ## collapse from-team if in team area
                         for ixx in range(0,zz.TEAMS[calc_from_t][3]):
-## CHECK - compare
                           if (rowf < zz.SRCHR[srch_from[ixx]][4]):         ## move from-searchers up by 1                          
                             zz.SRCHR[srch_from[ixx]][4] = zz.SRCHR[srch_from[ixx]][4]-1   ## move up a row                                       
                         if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col):     # only if in TEAM area
@@ -1295,8 +1146,10 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                           zz.TEAMS[calc_from_t2][3] = zz.TEAMS[calc_from_t2][3]-1          # reduce from cnt by 1
                       else:
                         zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1    ## moved searcher (from unas)
+                        iz = (zz.SRCHR[fnd_from_s][3] - ww.Nunas_col) * self.Nrows + zz.SRCHR[fnd_from_s][4]
+                        zz.UNAS_USED[iz] = 0                   ## set entry to unused                                                                                               
                     else:  ## must be at last column
-                      winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty                    
+                      winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, do not create a team in last column this way                    
                       if (DEBUG == 1): print("BEEP6c")
                       return
                     zz.SRCHR[fnd_from_s][3] = colt       ## move searcher after Team header (do after above, so as to not affect above search
