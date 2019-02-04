@@ -48,7 +48,7 @@ class AsyncCopy(threading.Thread):
           json.dump(temp,f)
           f.close()
 
-          print("Finished background file copy")
+          if (DEBUG == 1): print("Finished background file copy")
 								
 
 
@@ -631,15 +631,13 @@ class tabinfo(object):  ## table operations: tabload and tabmove
               
 #### START SRCHR LOOP:
         self.lin = 0      
-        text = self.SRCHR[self.lin][0]              
+        text = self.SRCHR[self.lin][0]
+        fnt = fntSmall2
+        color = QtCore.Qt.green
+        colorB = QtCore.Qt.yellow
         while (text != "END"):
             rowy = self.SRCHR[self.lin][4] % zz.Nrows          
             colx = self.SRCHR[self.lin][3]         
-            fnt = fntSmall2
-            color = QtCore.Qt.green
-            if ((self.SRCHR[self.lin][2] == self.findSrchrId or self.findSrchrId == " ") and self.SRCHR[self.lin][1] == self.findAgncy):
-              ##  match ID and AGNCY or just AGNCY if findID == 0      
-              color = QtCore.Qt.magenta
             if (self.SRCHR[self.lin][8] == "1"):   ## MED?
               xxx.tableWidget.coordxd[xxx.tableWidget.inxd] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyd[xxx.tableWidget.inxd] = xxx.tableWidget.rowViewportPosition(rowy)
@@ -654,6 +652,9 @@ class tabinfo(object):  ## table operations: tabload and tabmove
               xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(f"{text[:13]:<13}"+" "+self.SRCHR[self.lin][1]))
               xxx.tableWidget.item(rowy, colx).setFont(fnt)
               xxx.tableWidget.item(rowy, colx).setForeground(color)
+              if ((self.SRCHR[self.lin][2] == self.findSrchrId or self.findSrchrId == " " or len(self.findSrchrId) == 0) \
+                   and self.SRCHR[self.lin][1] == self.findAgncy):
+                xxx.tableWidget.item(rowy, colx).setBackground(colorB)
               if (colx >= Ui_MainWindow.Nunas_col and colx < zz.Nsets-1):   ## set used for locations in unassigned
                  npt = rowy + (colx - Ui_MainWindow.Nunas_col)*Ui_MainWindow.Nrows
                  self.UNAS_USED[npt] = 1         ## set position
@@ -669,7 +670,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
             setName = "B"
         self.saveSet = 1 - self.saveSet
         if (self.READIN == 1):
-          print("SAVE files %i"%self.saveSet)
+          if (DEBUG == 1): print("SAVE files %i"%self.saveSet)
           with open("DATA\saveAll"+setName+".json", 'w') as outfile:  ## opens, saves, closes
             json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM], outfile) ## save TEAMS and TEAM_NUM
           ## have another thread started to copy the last file written to another machine
@@ -706,18 +707,20 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         #  srch_list is the output list of searchers for this team
         #######  This routine assumes all searchers in a team are in one column
         ix = 0
-        srch_list = []
+        numSrchr = self.TEAMS[team_ptr][3]
+        srch_list = [0 for x in range(0, numSrchr)]
         ##xxx = self.SRCHR.index(["END"])+1
         ##print("END PLACE %i" % xxx)
 
         for s in range(0, self.SRCHR.index(["END"])):  #### STOP at "END"? try: self.SRCHR.index("END")+1
           #$#print("SRCH: %i,%i:%i,%i::%i,%i" %(t_row,t_col,self.SRCHR[s][6],self.SRCHR[s][5],self.SRCHR[s][4],self.SRCHR[s][3]))                                                 ##   OR self.SRCHR[0].index("END")+1
           if (t_row == self.SRCHR[s][6] and t_col == self.SRCHR[s][5]):
-            srch_list.append(s)     ## ordered list of searchers at this team    
+            srch_list[self.SRCHR[s][4] - t_row - 1] = s  ## ordered (by row under team header) list of searchers in team
             ix = ix + 1
         if (DEBUG == 1): print("TM_PTR: %i"%team_ptr)    
         if (ix != self.TEAMS[team_ptr][3]):
-          if (DEBUG == 1): print("Incorrect number of members for %s, %i != %i" % (self.TEAMS[team_ptr][0],ix,self.TEAMS[team_ptr][3]))
+          ## error message, so always print      
+          print("Incorrect number of members for %s, %i != %i" % (self.TEAMS[team_ptr][0],ix,self.TEAMS[team_ptr][3]))
           return [-1]
         return srch_list  
 
@@ -741,7 +744,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         if (fnd_from_t != -1):
             if (DEBUG == 1): print("FROM TEAM HEAD")  ## find all team searchers
             srch_from = tabinfo.fnd_srchrs(zz, fnd_from_t, rowf, colf)  ## returns list of from-searchers
-            if (srch_from[0] == -1): return
+            if (srch_from == -1): return
         elif (fnd_from_s != -1):
             if (DEBUG == 1): print("FROM SRCHR HEAD")
             # find the team header, same col (unless unas), start at rowf and go up
@@ -753,7 +756,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
 ### need to have colt, rowt of the team, not the srchr
               if (DEBUG == 1): print("B4 srch_from")    
               srch_from = tabinfo.fnd_srchrs(zz, calc_from_t, rx, colf)  ## returns list of from searchers
-              if (srch_from[0] == -1): return             
+              if (srch_from == -1): return             
               if (rx == 0 or calc_from_t == -1):
                 if (DEBUG == 1): print("Error, team-from header not found!")
             else:  ## in unassigned
@@ -768,7 +771,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         if (fnd_to_t != -1):
             if (DEBUG == 1): print("At fnd_to_t Ok")
             srch_to = tabinfo.fnd_srchrs(zz, fnd_to_t, rowt, colt)  ## srch_to <- pntr to SRCHR entry
-            if (srch_to[0] == -1): return
+            if (srch_to == -1): return
             lastRow = zz.TEAMS[fnd_to_t][2] + zz.TEAMS[fnd_to_t][3] # row of team header + numb of members
         elif (fnd_to_s != -1):
             if (DEBUG == 1): print("At fnd_to_s Ok")
@@ -777,7 +780,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                 calc_to_t = tabinfo.fndloc(self, zz.TEAMS, 2, 1, rx, colt)  ## do we need to save rx?
                 if (calc_to_t != -1): break   # found
             srch_to = tabinfo.fnd_srchrs(zz, calc_to_t, rx, colt)  ## srch_to <- pntr to SRCHR entry
-            if (srch_to[0] == -1): return            
+            if (srch_to == -1): return            
             lastRow = zz.TEAMS[calc_to_t][2] + zz.TEAMS[calc_to_t][3] # row of team header + numb of members
             if (DEBUG == 1): print("AT findit")
             if (rx == 0 or calc_to_t == -1):
@@ -834,8 +837,8 @@ class tabinfo(object):  ## table operations: tabload and tabmove
               return
 
               
-## MOVE TEAM logic
         if (DEBUG == 1): print("xt %i, %i" % (fnd_from_t,fnd_to_t))
+## MOVE TEAM logic
         if (fnd_from_t != -1):     # from is pointing to team
           if (colf == 0):
             return                 ## don't move team if in column 0
@@ -974,7 +977,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty                    
                     if (DEBUG == 1): print("BEEP3")     # needs to be empty location
                     return        
-                else:  ## to is in norm area   
+                else:  ## to is in team area   
                     if (colf < ww.Nunas_col):   ## not for moving from-srchr if in unas
                       m = 0
                       for ixx in range(0,zz.TEAMS[calc_from_t][3]):
@@ -1019,11 +1022,10 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     for ixx in range(0,zz.TEAMS[calc_to_t][3]):
                       if (DEBUG == 1): print("ATx: %i,%i,%i:%i"%(rowt,ixx,srch_to[ixx],zz.SRCHR[srch_to[ixx]][4]))
      ###  could find which index in srch_to == rowt b4 above loop
-                      ## add 1 to rowt to move the 'next' existing srchr down by 1
+                      ## add 1 to rowt to move the 'next' existing srchr down by 1                     
                       if (rowt+1 == zz.SRCHR[srch_to[ixx]][4] or m == 1): ## move to-searchers down by 1
                         m = 1
                         zz.SRCHR[srch_to[ixx]][4] = zz.SRCHR[srch_to[ixx]][4]+1  ## move down a row (only 1 mover)  OKAY?
-                        #####zz.SRCHR[srch_to[ixx]][4] = rowt+m
                     zz.TEAMS[calc_to_t][3] = zz.TEAMS[calc_to_t][3]+1  ## add 1 to team
                     if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col): # only if in TEAM area
                         setDeleteTeam = 2
@@ -1032,7 +1034,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                         zz.TEAMS[calc_from_t][3] = zz.TEAMS[calc_from_t][3]-1  # reduce from cnt by 1
                     ## below, add 1 to place the new srchr below the existing srchr    
                     zz.SRCHR[fnd_from_s][4] = rowt+1  # add srchr to new team (or within orig team) after srchr, remove from from_team
-                    zz.SRCHR[fnd_from_s][3] = colt                          
+                    zz.SRCHR[fnd_from_s][3] = colt    # Note, searcher is added below the position pointed to                         
                     zz.SRCHR[fnd_from_s][5] = zz.TEAMS[calc_to_t][1]    ## col - point to team entry
                     zz.SRCHR[fnd_from_s][6] = zz.TEAMS[calc_to_t][2]
                     if (setDeleteTeam == 1):

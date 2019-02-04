@@ -331,7 +331,12 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
 
         #print("POP1: %s"%zz.saveTeam)
         zz.saveTeam.pop()
-        zz.TEAMS = zz.saveTeam.pop()      ## what if previous operation only affected a srchr?
+        try:
+          zz.TEAMS = zz.saveTeam.pop()      ## what if previous operation only affected a srchr?
+        except:
+          print("End of queue")
+          winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty          
+          return
         zz.saveSrchr.pop()
         zz.SRCHR = zz.saveSrchr.pop()
         zz.saveUnUsed.pop()
@@ -353,10 +358,10 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         zz = self.zz2
         if (DEBUG == 1): print("At readmemb %i\n" % self.modex)
         self.modex = 1 - self.modex    ## change state  test
-        xmodel(self.modex)   # call routine outside of class test
+        xmodel(self.modex)             # call routine outside of class test
         test_info = yy.infox.text()
         if (test_info[0:4].upper() != "JSON"):  ## if INFOX has "JSON" means recovery
-          if (zz.READIN == 0):  ## otherwise skip MEMBERS readin ...
+          if (zz.READIN == 0):  ## otherwise skip MEMBERS read-in, but do OTHERS read-in
              zz.MEMBERS = []          ## reset list
              zz.READIN = 1      ## set as having been read
                    
@@ -427,11 +432,17 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
                 setName = "B"
                ##   Newest save time.  If corrupted, then delete
                ##   the set and use the other one
-            print("Set: %s"%setName)             
-            with open("DATA\saveAll"+setName+".json", 'r') as infile:  ## opens, reads, closes
+            print("Set: %s"%setName)
+            zz.READIN = 1   ## set as having read members in
+            try:
+              with open("DATA\saveAll"+setName+".json", 'r') as infile:  ## opens, reads, closes
                 [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM] = json.load(infile)   
-            print("Doing recovery reload...")    
-            zz.tabload(yy)    
+              print("Doing recovery reload...")    
+              zz.tabload(yy)
+            except:
+              print("Bad JSON save file, try other version")
+              winsound.Beep(2500, 1200)       ## BEEP, 2500Hz for 1 second, needs to be empty
+              
 
 
     def numbers(self,n):  ## take the number buttons and fill SAR ID field
