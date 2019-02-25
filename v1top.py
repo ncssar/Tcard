@@ -30,7 +30,6 @@ from datetime import date, datetime
 from random import *
 from operator import itemgetter
 
-####### ADD undo button to put back previous move operation - how to catalog?
 sys.tracebacklimit = 1000
 
 ### interval timing function In a separate thread
@@ -90,7 +89,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         # super is used here in that it allows us to
         # access variables, methods etc in the v1.py file
         super(self.__class__, self).__init__()
-        xx=v1.Ui_MainWindow()  ## see yy below  Are these both separate instances?
+        xx=v1.Ui_MainWindow()  ## also see yy below
                                     ## works here because Hmain and Wmain are class variables?
         self.setupUi(self)          # This is defined in v1.py file automatically
         if (DEBUG == 1): print("main self: %s" % self)
@@ -126,12 +125,14 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         self.tableWidget.cellClicked.connect(self.cell_was_clicked)
         self.tableWidget.cellDoubleClicked.connect(self.cell_was_Dclicked)
         self.tableWidget2.cellClicked.connect(self.dialog_was_clicked)
+        self.tableWidget5.cellClicked.connect(self.dialog_was_clicked4)
         self.tableWidget3.cellClicked.connect(self.dialog_was_clicked2)
         self.tableWidget4.cellClicked.connect(self.dialog_was_clicked3)        
         self.selected = 0  ## preset to nothing selected   NOT USED?
         self.setAcceptDrops(True)               ## do not pickup drag/drop if assoc with tableWidget
         self.tableWidget.setDragEnabled(True)   ## needs to refer to tablewWidget
-        
+
+        zz = v1.tabinfo()
 
 ### call to timing function
         @setInterval(20)  ## decorator to call timing thread (seconds)
@@ -143,8 +144,16 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
           ##print("Call to func")
         ##self.num = 1
         self.stop = datetime_update(self)  ## start timer
-        ##self.stop.set()    ## stop timer
-
+        self.num = 0
+        ##self.stop.set()        ## will stop timer
+        
+        @setInterval(30)         ## 30 seconds to recheck members file update
+        def chk_new_srchr(xxx):  ## checks for update of searchers new/remove
+            self.num = self.num+1
+            self.mm.infox.setText("30 sec timer count: "+str(self.num))
+        #
+        ##self.stop2 = setInterval(chk_new_srchr(self))   # start timer2
+        #
 
         ###  The following does not appear to have an affect
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -152,14 +161,16 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         sizePolicy.setVerticalStretch(1)
         self.tableWidget.setSizePolicy( sizePolicy )
 
-######   TEMPORARY PRE-LOAD OF INFO TABLE THAT EMULATES A DATABASE   ######
+
 #
 #  list TEAMS : [Name, xloc, yloc, #srchrs, type, location, timeout]
 #
-#  list SRCHR : [Name, agency, idnumb, xloc, yloc, xteam, yteam, leader (bit), medical (bit), TimeIN, TimeOUT]
+#  list SRCHR : [Name, agency, idnumb, xloc, yloc, xteam, yteam, leader (bit), medical (bit), Blink, Cell#, Resources]
 #
-#  list MEMBERS:[Name, IDval, Cnty, leader, medical, checked-in]
-# preset
+#  list MEMBERS:[Name, IDval, Agncy, leader, medical, TimeIN, TimeOUT, Cell#, Resources, CumTime]  (use TimeIn != "-1" as checked-in)
+#                                         Want to add total time field for multiple time segments
+#
+# preset values  for each type
 #       TEAMS : sheriff -> [Sheriff Coord, 0,0,0,IC,IC,0.0]
 #               ops     -> [OPS, 0,8,0,IC, IC, 0.0]
 #               unas    -> [UnAssigned, Nunas_col,0,UNAS, IC, 0,0]
@@ -175,7 +186,6 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         savei = 0
         savej = 0
         clr_order = "RGBYMC "  ## team #
-        zz = v1.tabinfo()
         self.zz2 = zz
         ##print("TOP: %s:%s"%(zz,self.zz2))
         zz.TEAM_NUM = 0
@@ -195,16 +205,12 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         zz.TEAMS.append(["END"])
         if (DEBUG == 1): print(zz.TEAMS[team_unas])
 
-############## GET rid of the following load  ????
-        
-        ##  Name, agency, IdNumb, xloc, yloc, TeamPtr, Med(bit), Leader(bit)
-        col = 6  # starting
-        row = 1
-        iw = 0
+        iw = 0     ## initialization
         zz.TEAMS[team_unas][3] = iw  ## set number of searchers in unassigned    
         zz.SRCHR.append(["END"])   
-        zz.tabload(self)         ## load display table                                                                   
+        zz.tabload(self,0)         ## load display table
         if (DEBUG == 1): print("At init\n")
+        ####  end of __init__
 
 
     def _addSrchr(self): ## Button ADD SEARCHER
@@ -235,9 +241,9 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         if (memPtr == -1):                  ## ID not found
             winsound.Beep(2500, 1200)       ## BEEP, 2500Hz for 1 second, needs to be empty
             return
-        elif (zz.MEMBERS[memPtr][5] == 1):  ## member already checked-in, ignore
-            winsound.Beep(2500, 300)        ## BEEP, short 2500Hz, needs to be empty
-            winsound.Beep(2500, 300)        ## double
+        elif (zz.MEMBERS[memPtr][5] != -1):    ## member already checked-in, ignore
+            winsound.Beep(2500, 300)           ## BEEP, short 2500Hz, needs to be empty
+            winsound.Beep(2500, 300)           ## double
             yy.sarID.setText("")
             return
         if (DEBUG == 1): print("PTR  %s"%memPtr)
@@ -254,43 +260,50 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         colu = int(ixx/yy.Nrows)
         rowu = ixx - colu * yy.Nrows
         colu = colu + yy.Nunas_col
-        TimeIN = time.strftime("%Y-%m-%d, %H:%M:%S")
-        if (DEBUG == 1): print("TimeIN %s"% TimeIN)  ## If the srchr comes back how to accum time?
+        TimeIN = time.time()
+        if (DEBUG == 1): print("TimeIN %i"% TimeIN)  ## If the srchr comes back how to accum time? In members
         zz.SRCHR.insert(-1,[zz.MEMBERS[memPtr][0],zz.MEMBERS[memPtr][2],zz.MEMBERS[memPtr][1],  \
-                        colu, rowu, yy.Nunas_col, 1, zz.MEMBERS[memPtr][3], zz.MEMBERS[memPtr][4], TimeIN, -1])  ## place before "END"
-        if (DEBUG == 1): print("SRCHR ptr: %i\n" % len(zz.SRCHR))   ## ptr minus 2
-        zz.MEMBERS[memPtr][6] = len(zz.SRCHR)-2    ## ptr into the SRCHR list
-        zz.MEMBERS[memPtr][5] = 1                  ##  set as checked-in
+                        colu, rowu, yy.Nunas_col, 1, zz.MEMBERS[memPtr][3], zz.MEMBERS[memPtr][4], 5, \
+                        zz.MEMBERS[memPtr][7], zz.MEMBERS[memPtr][8]]) # set blink to 5 sec
+                                    ## Team is Unas at (Nunas_col,1) place before "END"
+        zz.MEMBERS[memPtr][6] = -1                      ## time-out initialize to -1
+        zz.MEMBERS[memPtr][5] = TimeIN                  ##  set as time-in
 ###
 ###  Need to construct correct entry
 ###       ALSO, check that SAR has not already been loaded
 ###             AND, when removing check that it was there        
 ###
-##   SRCHR:        Name, agency, IdNumb, xloc, yloc, TeamX, TeamY, Leader(bit, Med(bit), TimeIN, TimeOUT
+##   SRCHR :        Name, agency, IdNumb, xloc, yloc, TeamX, TeamY, Leader(bit), Med(bit), Blink vs TimeIN, TimeOUT    ???
 ## put these \/ in some initialization place
 ##   incase searchers are added after movement has occurred, need to skip locations already used        
 
-        zz.TEAMS[team_unas][3] = zz.TEAMS[team_unas][3] +1  ## set number of searchers in unassigned
+        zz.TEAMS[team_unas][3] = zz.TEAMS[team_unas][3] + 1  ## set number of searchers in unassigned
         yy.saveLastIDentry = yy.sarID.text()
         yy.sarID.setText("")  ## clear sarID field
         if (DEBUG == 1): print("PTR2 %s"%yy)
-        zz.tabload(yy)         ## load display table
+        zz.masterBlink = 10      ## set time for blinker to run until restarted
+        zz.time_chk()            ## start blinker clock
+        zz.tabload(yy,0)         ## load display table
 
 
     def _rmSrchr(self): ## button REMOVE SEARCHER
         zz = self.zz2
-        yy = self.mm  
+        yy = self.mm
+        #
+        ## Can send a bit back to sign-in that the member is associated with a Team (vs Unassigned)
+        ##   to indicate that the member cannot be removed.  To create this bit check the SRCHR
+        ##   team location [5] and [6] to see if = Nunas_col, 1 (Unassigned)
+        #
 
         memPtr = -1
         sarIDval = yy.sarID.text()
         if (sarIDval == ""):   ## blank entry means to remove previous ADD searcher (probably incorrect member chosen)
-#### FIX UP  add agency check
-          sarIDval = yy.saveLastIDentry     ####  NEED to get agency, too  PARSE ID and agency from entry
+          sarIDval = yy.saveLastIDentry       ####  NEED to get agency, too  PARSE ID and agency from entry
 
-        sarINFOsplit = sarIDval.split()   ## SAR ID field can be "ID" or "ID AGENCY"
+        sarINFOsplit = sarIDval.split()       ## SAR ID field can be "ID" or "ID AGENCY"
         sarIDval = sarINFOsplit[0].upper()
         sarAGENCY = "NC"                      ## default AGENCY
-        if (len(sarINFOsplit) > 1):         ## then agency arg was entered
+        if (len(sarINFOsplit) > 1):           ## then agency arg was entered
           sarAGENCY = sarINFOsplit[1].upper()
           
         for xx in range(0,len(zz.MEMBERS)):
@@ -301,7 +314,6 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             winsound.Beep(2500, 1200)   ## BEEP, 2500Hz for 1 second, member not found
             return
         if (DEBUG == 1): print("PTR  %s"%memPtr)        
-        zz.MEMBERS[memPtr][5] = 0       ##  set as checked-out
         fnd = -1
         for ptr in range(0, len(zz.SRCHR)-1):  ## do not test the lst element (END)
           ## match ID and agency  
@@ -309,30 +321,33 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             fnd = 1
             if (DEBUG == 1): print("ID, Cnty %s %s"%(zz.SRCHR[ptr][2],zz.SRCHR[ptr][1]))
             break
-        if (fnd == -1 or (zz.SRCHR[ptr][5] != yy.Nunas_col and zz.SRCHR[ptr][6] != 1 )): ## team must be unassigned
+        if (fnd == -1 or (zz.SRCHR[ptr][5] != yy.Nunas_col and zz.SRCHR[ptr][6] != 1 )): ## TEAM of SRCHR must be UNASSIGNED
             winsound.Beep(2500, 1200)   ## BEEP, 2500Hz for 1 second, searcher not found
             return          
-        TimeOUT = time.strftime("%Y-%m-%d, %H:%M:%S") ## possibly add to SRCHR record
-        zz.SRCHR[ptr][10] = TimeOUT #  does not help if we next delete the entry??
+        TimeOUT = time.time()                         ## add to MEMBERS record
+        zz.MEMBERS[memPtr][6] = TimeOUT               ##  set as checked-out
+        zz.MEMBERS[memPtr][9] = zz.MEMBERS[memPtr][9] + zz.MEMBERS[memPtr][6] - zz.MEMBERS[memPtr][5]  ## cum time
+        zz.MEMBERS[memPtr][5] = -1                    ## reset for next checkin
         rowy = zz.SRCHR[ptr][4]
         colx = zz.SRCHR[ptr][3]
         npt = rowy + (colx - yy.Nunas_col)*yy.Nrows
         zz.UNAS_USED[npt] = 0
-        del zz.SRCHR[ptr]           ## are we deleting the record or marking it as GONE
-### Only remove if in Unassigned.  THEN, also put the space as available again  
+        del zz.SRCHR[ptr]                     ## we are deleting the record and marking MEMBERS entry with TimeOUT
+### Will only remove if in Unassigned.  THEN, also put the space as available again  
         yy.sarID.setText("")
-        zz.tabload(yy)              ## update table
+        zz.tabload(yy,0)                      ## update table
 
 
     def _undo(self): ## Button UNDO - put status/display back one change, saving MEMBERS, too
         zz = self.zz2
+        yy = self.mm
         if (DEBUG == 1): print("At undo %i \n" % self.modex)
         ## call undo_table (single deep)
 
         #print("POP1: %s"%zz.saveTeam)
         zz.saveTeam.pop()
         try:
-          zz.TEAMS = zz.saveTeam.pop()      ## what if previous operation only affected a srchr?
+          zz.TEAMS = zz.saveTeam.pop()      
         except:
           print("End of queue")
           winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty          
@@ -343,8 +358,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         zz.UNAS_USED = zz.saveUnUsed.pop()
         zz.saveMembers.pop()                ## these are double pop's because of intervening append
         zz.MEMBERS = zz.saveMembers.pop()
-
-        v1.tabinfo.tabload(self, self.save_pntr)    ## call tabload to update screen
+        zz.tabload(yy,0)
         
 
         
@@ -353,42 +367,53 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         ####### FOR the case when the INFOX box starts with JSON, instead this is a recovery and
         #######   the latest JSON files are read and populate TEAMS, SRCHR, UNAS_USED and MEMBERS
         
-        caps = ["EMT", "PA", "RN"]  ##  capabilities for Medical type - probably temporary
+        caps = ["EMT", "PA"]  ##  capabilities for Medical type - probably temporary?
         yy = self.mm
         zz = self.zz2
         if (DEBUG == 1): print("At readmemb %i\n" % self.modex)
         self.modex = 1 - self.modex    ## change state  test
         xmodel(self.modex)             # call routine outside of class test
         test_info = yy.infox.text()
-        if (test_info[0:4].upper() != "JSON"):  ## if INFOX has "JSON" means recovery
+        if (test_info[0:4].upper() != "JSON" and test_info[0:4].upper() != "REMO" ):
+            ## if INFOX has "JSON" means recovery; if REMOTE means get info from sign-in program output
           if (zz.READIN == 0):  ## otherwise skip MEMBERS read-in, but do OTHERS read-in
              zz.MEMBERS = []          ## reset list
              zz.READIN = 1      ## set as having been read
                    
              my_file = Path("MEMBERS2.csv")       #############  NCSSAR member database
              if my_file.is_file():
-               with open('MEMBERS2.csv','rt') as csvIN:
+               with open(my_file,'rt') as csvIN:
                  csvPtr = csv.reader(csvIN, dialect='excel')
                  regShrf = r"[0-9][A-Z].*"        ## reg ex to find sheriff IDs
                  for row in csvPtr:
-                   make = ["0", "0", "NC", "0", "0", "0", "0"]  ## need to re-initalize make here for some reason
+                   make = ["0", "0", "NC", "0", "0", -1, -1, " ", " ", 0]  ## MEMBERS: need to re-initalize make here for some reason
                    if (row[0].isdigit()):        ## has to be all digits (searcher)
-                     make[1] = row[0]
-                     make[0] = row[1]
+                     make[1] = row[0]   # SAR ID
+                     make[0] = row[1]   # name
+                     make[7] = row[3]   # cell number
+                     make[8] = row[5]   # resources
                      for cx in caps:
                        regcap = r"[ ,]" + cx + r"[ ,]"
                        fnd = re.search(regcap, row[5])
                        if (fnd != None):     ## found a match
                          make[4] = "1"   
-                     if (row[6] == "1"):       ## type 1 searcher; used for now to choose LEADER temporary
+                     if (row[6] == "1"):       ## type 1 searcher; used for now to choose LEADER (temporary)
                        make[3] = "1"        
                    elif (re.search(regShrf, row[0]) != None):    ## numb/letter... found sheriff coord
                      make[1] = row[0]
                      make[0] = row[1]
+                     make[7] = row[3]   # cell number
+                     make[8] = row[5]   # resources
                    else:
-                     continue                   ## valid entry not located - go to next line               
+                     continue                   ## valid entry not located - go to next line
+      #
+      ## For remote sign-in do we want to check if member has already been loaded?
+      ## For pickup from sign-in do we want to assign time-in and then time-out to MEMBERS db?
+      ##     Or when using sign-in program, we do not use MEMBERS db??
+      ## From sign-in need: Name, ID#, Agency, leader, medical, time-in, time-out, capabilities? (Carda, OHV, Nordic...)
+      ##      if done, any need for Members db? could save info for searcher, while eliminating from SRCHR db when they leave
+      #              
                    zz.MEMBERS.append(make)        ## load MEMBERS if valid entry
-               
                if (DEBUG == 1): print("\n\n")
                if (DEBUG == 1): print("READ: %s:%s"%(zz,self.zz2))
              else:
@@ -402,13 +427,14 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
 
 ##### Could check for existing ID and agency and replace upon readin
 
-          ###  format of others is "Member,ID,agency,Leader,Medical,CheckedIn" add cell for SRCHR pntr
+          ###  format of others is "Member,ID,agency,Leader,Medical,(add CheckedIn)(maybe add time-out?)" 
           if my_file.is_file():
             if (DEBUG == 1): print("In other")  
             with open('OTHERS.csv','rt') as csvIN2:
               csvPtr = csv.reader(csvIN2, dialect='excel')
               for row in csvPtr:
-                row = [row[0],row[1],row[2],row[3],row[4],row[5], "0"]  ## add position for SRCHR pointer
+                ## name, ID, Agency
+                row = [row[0],row[1],row[2],row[3],row[4],-1, -1, " ", " ", 0]      ## will map to srchr
                 ifnd = 0  
                 for ix in range(len(zz.MEMBERS)):          
                   if (row[1] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID,agency
@@ -416,33 +442,62 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
                     zz.MEMBERS.insert(ix,row)
                     ifnd = 1                   ## mark event
                     break                      ## done, so skip the rest
-                if (ifnd == 0):                  ##    add
-                  zz.MEMBERS.append(row)         ## possibly change # and order of cells
+                if (ifnd == 0):                ##    add
+                  zz.MEMBERS.append(row)       ## possibly change # and order of cells
                   if (DEBUG == 1): print("new row: %s" % row)  
           ### ignore otherwise
           if (DEBUG == 1): print("READ: %s"%zz.SRCHR)
           
-        else:       ## read json files to load MEMBERS, TEAMS, SRCHR, UNAS_USED for recovery
+        elif (test_info[0:4].upper() == "JSON"): ## read json files to load MEMBERS, TEAMS, SRCHR, UNAS_USED for recovery
             if (DEBUG == 1): print("JSON found")
-            mtimeA = os.path.getmtime("DATA\saveUnasA.json")
-            mtimeB = os.path.getmtime("DATA\saveUnasB.json")
-            if (mtimeA > mtimeB):
-                setName = "A"   
-            else:
-                setName = "B"
+            mt1 = 0
+            for m in range(0,5):    # find most recent saved state file
+              mtime = os.path.getmtime("DATA\saveAll"+zz.saveNames[m]+".json")
+              if (mtime > mt1):
+                  mt1 = mtime
+                  mpnt = m
+            setName = zz.saveNames[mpnt]
                ##   Newest save time.  If corrupted, then delete
                ##   the set and use the other one
             print("Set: %s"%setName)
             zz.READIN = 1   ## set as having read members in
             try:
               with open("DATA\saveAll"+setName+".json", 'r') as infile:  ## opens, reads, closes
-                [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM] = json.load(infile)   
+                [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM, zz.RemoteSignInMode, \
+                                                                     zz.RemoteLastRow] = json.load(infile)   
               print("Doing recovery reload...")    
-              zz.tabload(yy)
+              zz.tabload(yy,0)
             except:
               print("Bad JSON save file, try other version")
               winsound.Beep(2500, 1200)       ## BEEP, 2500Hz for 1 second, needs to be empty
-              
+        else:   # MUST be REMOTE  will check every so many seconds and see if file time-modified is updated
+            pass
+            zz.RemoteSignInMode = 1
+            ###   Start timer above
+            ##  Enable check remote sign-in timer here; In timer routine check time modified and if so, do...
+            ##     since timer is a separate thread need to be careful (have a LOCK? when in tabmove2?) when updating
+            ##     SRCHR and TEAMS.  Should not be an issue with MEMBERS db.
+            print("At Remote sign-in")
+### following s/b in timer section?   
+            irow = 0
+            #with open('REMOTE_SIGN_IN.csv','rt') as csvIN2:
+            #  csvPtr = csv.reader(csvIN2, dialect='excel')
+            #  for row in csvPtr:
+            #      irow = irow + 1
+            #      if (irow <= zz.RemoteLastRow): continue  ## skip lines already processed
+            #      row = [row[0],row[1],row[2],row[3],row[4],row[5], "0"]  ## add position for check-in time, maybe one for time-out?
+            #      ifnd = 0
+                  ## save pointer to last record to be able to skip down to first 'new' (will save value for
+                  ##    possible recovery.  Also, need to save flag that system is in REMOTE sign-in mode
+                  ## move down file to first 'new' record.  Quick way to go to Nth row?
+            #      for ix in range(len(zz.MEMBERS)):          
+            #          if (row[1] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID,agency
+                      ## if does not exist -> add member and srchr in unassigned
+                          ## if exists and if time_out is set ->  set time_out in member and remove srchr
+                          ##    to remove searcher may have to first move to unassigned?
+                          ## if exists and time_out not set, ignore (since only looking at new records , this
+                          ##    should not happen; maybe put out message)
+            #  zz.RemoteLastRow = irow  # save updated row count
 
 
     def numbers(self,n):  ## take the number buttons and fill SAR ID field
@@ -475,6 +530,8 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         Ssort = sorted(zz.SRCHR[0:-1],key=itemgetter(3,4))
         tsStrt = 0
         ssStrt = 0
+        ## write header
+        fts.write("%s   %s\n" % ("Search", yy.dateTime.text()))
         while 1:
          for ts in range(tsStrt,len(Tsort)):  ## possibly use while
           ifnd = 0  
@@ -487,7 +544,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             break
          ccnt = 0
          ssStrt = 0  ## have to restart search for srchr due to possible ordering
-         if (ifnd==1):
+         if (ifnd == 1):
           for ss in range(ssStrt,len(Ssort)):
            cloc = Ssort[ss][3]*yy.Nrows + Ssort[ss][4]  
            if (cloc == sloc):
@@ -518,7 +575,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             if (DEBUG == 1): print("LMB")
         self.selected = 1
         if (DEBUG == 1): print("Row %d and Column %d was clicked" % (row+1, column+1))
-        item = self.tableWidget.item(row, column)  #  why not  itemAt(row, column)?
+        item = self.tableWidget.item(row, column)  
         if (DEBUG == 1):
           if (item != None): print("Item is #%s#\n" % item.text())
           else: print("*** Item was None ***")
@@ -529,7 +586,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         if (DEBUG == 1): print(".....repaint click.....")        
         
     def cell_was_Dclicked(self, row, column):
-        ## Does a 5double click always also create a single click?
+        ## Does a double click always also create a single click?
         ## appears default item change is by double click; can this be turned-off? yes
         if (DEBUG == 1): print("Row %d and Column %d was Dclicked" % (row+1, column+1))
         text = self.ID
@@ -537,7 +594,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         ##  currentRow or currentColumn  itemAt gives item, not contents
         ##      using .text() will give the contents
 
-    def dialog_was_clicked(self, row, column): ## tableWidget2  RMB for Team
+    def dialog_was_clicked(self, row, column): ## tableWidget2  RMB for Team (settable)
         ##
         if self.selected :         ## PROBABLY not used??
             self.selected = 0  # reset after 1 more click
@@ -545,52 +602,106 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             self.selected = 1
         item = self.tableWidget2.item(2,1)   ## just to set a value    
         if (DEBUG == 1): print("DIALOG HIDE: Row %d and Column %d was clicked" % (row+1, column+1))
-        if (column == 0 or row == 3): item = self.tableWidget2.item(row, column)  #  why not  itemAt(row, column)?
+        if (column == 0 or row == 3): item = self.tableWidget2.item(row, column) 
         if (DEBUG == 1):
           if (item != None): print("Item is %s\n" % item.text())
           else: print("*** Item was None ***")
         if (row == 3):
           self.tableWidget2.hide()
           if (column == 0):  ## Ok
-            ## change values in TEAMS (& re-display?)  (otherwise leave them alone)
+            ## change values in TEAMS (& re-display)  (otherwise leave them alone)
               if (DEBUG == 1): print("FOUND: %s %s"% (self.tableWidget.fnd_team,self.tableWidget2.item(0,1).text()))
               self.zz2.TEAMS[self.tableWidget.fnd_team][0] = self.tableWidget2.item(0,1).text()
               self.zz2.TEAMS[self.tableWidget.fnd_team][4] = self.tableWidget2.item(1,1).text()
               self.zz2.TEAMS[self.tableWidget.fnd_team][5] = self.tableWidget2.item(2,1).text()                    
-              self.zz2.tabload(self.mm)
+              self.zz2.tabload(self.mm,0)
+
+    def dialog_was_clicked4(self, row, column): ## tableWidget2  RMB for Searcher Detail (view only, except remove)
+        ##
+        yy = self.mm
+        zz = self.zz2
+        
+        if self.selected :         ## PROBABLY not used??
+            self.selected = 0      # reset after 1 more click
+            return
+            self.selected = 1
+        item = self.tableWidget5.item(4, 1)   ## info at Remove?
+        if (item.text().upper() == "Y"):      ## Yes remove
+            if (row == 5 and column == 0):
+               ptr = self.tableWidget.fnd_srchr
+               if (self.zz2.SRCHR[ptr][5] != yy.Nunas_col and zz.SRCHR[ptr][6] != 1 ): ## TEAM of SRCHR must be UNASSIGNED
+                  winsound.Beep(2500, 1200)   ## BEEP, 2500Hz for 1 second, searcher not found
+                  return          
+               TimeOUT = time.time()          ## add to MEMBERS record
+               memPtr = -1
+               for xx in range(0,len(zz.MEMBERS)):           ## find the MEMBERS record
+                   if (zz.MEMBERS[xx][1] == zz.SRCHR[ptr][2] and zz.MEMBERS[xx][2] == zz.SRCHR[ptr][1]): # match Id, Agency
+                       memPtr = xx
+                       break               
+               zz.MEMBERS[memPtr][6] = TimeOUT         ##  set as checked-out (AT some point want to add total time field
+               zz.MEMBERS[memPtr][9] = zz.MEMBERS[memPtr][9] + zz.MEMBERS[memPtr][6] - zz.MEMBERS[memPtr][5]  ## cum time
+               zz.MEMBERS[memPtr][5] = -1              ## reset for next checkin               
+               rowy = zz.SRCHR[ptr][4]
+               colx = zz.SRCHR[ptr][3]
+               npt = rowy + (colx - yy.Nunas_col)*yy.Nrows
+               zz.UNAS_USED[npt] = 0
+               del zz.SRCHR[ptr]                       ## we are deleting the record and marking MEMBERS entry with TimeOUT
+        if (DEBUG == 1): print("DIALOG HIDE: Row %d and Column %d was clicked" % (row+1, column+1))
+        if (row == 5):
+          self.tableWidget5.hide()
+        zz.tabload(yy,0)
+        ##   really no need to update the table unless remove is happening                   
+
 
     def dialog_was_clicked2(self, row, column): ## tableWidget3  RMB last column groups
         ##
         if (DEBUG == 1): print("Dialog3 GROUPS row: %i, column: %i"%(row, column))
+        item = self.tableWidget3.item(row,column).text()
+        if (row == 4): return    # set choice value
+        if (row == 5):           ## This is OK.  Need to set group name for choice first 
+            item = self.tableWidget3.item(4,0).text()
+            if (item == "<create>"):      ## not set so skip
+                self.tableWidget3.hide()
+                return    
+            self.tableWidget3.setItem(4,0,QtWidgets.QTableWidgetItem("<create>"))  # reset to default 
         self.tableWidget3.hide()
-        self.zz2.TEAMS.insert(self.zz2.TEAMS.index(["END"]),[self.tableWidget3.item(row,column).text(), \
-                    self.tableWidget.ccm, self.tableWidget.rrm, 0, self.tableWidget3.item(row,column).text(), "--", 0.0]) # insert prior to END                    
-        self.zz2.tabload(self.mm)
+        self.zz2.TEAMS.insert(self.zz2.TEAMS.index(["END"]),[item, \
+                    self.tableWidget.ccm, self.tableWidget.rrm, 0, item, "--", 0.0]) # insert prior to END                    
+        self.zz2.tabload(self.mm,0)
 
-    def dialog_was_clicked3(self, row, column): ## tableWidget4  RMB out-of-bounds
+    def dialog_was_clicked3(self, row, column): ## tableWidget4  RMB out-of-bounds FIND
         ##
         if self.selected :         ## PROBABLY not used??
-            self.selected = 0  # reset after 1 more click
+            self.selected = 0      # reset after 1 more click
             return
             self.selected = 1
         item = self.tableWidget4.item(2,1)   ## just to set a value    
         if (DEBUG == 1): print("DIALOG4 OUT-OF-Bounds Row %d and Column %d was clicked" % (row+1, column+1))
-        if (column == 0 or row == 3): item = self.tableWidget4.item(row, column)  #  why not  itemAt(row, column)?
+        if (column == 0 or row == 5): item = self.tableWidget4.item(row, column)  
         if (DEBUG == 1):
           if (item != None): print("Item is %s\n" % item.text())
           else: print("*** Item was None ***")
-        if (row == 3):
+        if (row == 5):
           self.tableWidget4.hide()
           if (column == 0):  ## Ok
-            ## change values in TEAMS (& re-display?)  (otherwise leave them alone)
+            ## change values in TEAMS (& re-display)  (otherwise leave them alone)
               if (DEBUG == 1): print("Looking for SrchrId %s and Agency %s"%(findSrchrId,findAgncy))
               self.zz2.findSrchrId = self.tableWidget4.item(1,1).text()
-              self.zz2.findAgncy = self.tableWidget4.item(2,1).text()
+              self.zz2.findAgncy = self.tableWidget4.item(3,1).text()
+              self.zz2.findName = self.tableWidget4.item(2,1).text()
+              self.zz2.findResource = self.tableWidget4.item(4,1).text()
+              if (self.zz2.findResource == " " or len(self.zz2.findResource) == 0):
+                  self.zz2.findResource = "xxx"     # set to value that will not match
+              if (self.zz2.findName == " " or len(self.zz2.findName) == 0):
+                  self.zz2.findName = "xxx"         # set to value that will not match
+  ### ?  Add info for resource type             
               if (self.zz2.findAgncy == " "): self.zz2.findAgncy = "NC"   ## the default
           else:              ## cancel
               self.zz2.findSrchrId = "0"
               self.zz2.findAgncy = " "
-          self.zz2.tabload(self.mm)    ## for Ok or Cancel update the maintable           
+              self.zz2.findName = "xxx"
+              self.zz2.findResource = "xxx"  # set to not match 'blank'
+          self.zz2.tabload(self.mm,0)        ## for Ok or Cancel update the maintable           
 
 #### end of TableApp class
 

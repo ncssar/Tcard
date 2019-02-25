@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFont
 from random import *
 import winsound
+import time
 from collections import deque  ## provides for faster copy operations than a normal list
 import copy                    ## using deepcopy for copying complex lists
 import csv
@@ -26,7 +27,7 @@ global DEBUG
 DEBUG = 0
 fntNorm = QFont("Times", 14)
 fntSmall = QFont("Times", 10)
-fntSmall2 = QFont("Consolas", 9)
+fntSmall2 = QFont("Consolas", 9)    # should be mono-space
 fntBold = QFont("Times", 12, QtGui.QFont.Bold)
 fntField = QFont("Times", 16, QtGui.QFont.Bold)
 
@@ -47,7 +48,6 @@ class AsyncCopy(threading.Thread):
           f = open(self.out, "w")
           json.dump(temp,f)
           f.close()
-
           if (DEBUG == 1): print("Finished background file copy")
 								
 
@@ -84,7 +84,7 @@ class PaintTable(QtWidgets.QTableWidget):
             if (self.ccm >= 0 and self.rrm > 0):    ## on grided table
               self.fnd_team = tabinfo.fndloc(self, self.pntrtab.save_pntr.TEAMS, 2, 1, self.rrm, self.ccm) 
               if (DEBUG == 1): print("row %i column %i fnd %i" % (self.rrm, self.ccm, self.fnd_team))
-              if (self.fnd_team != -1):   ## pointing to a team
+              if (self.fnd_team != -1):   ## pointing to a TEAM
                 if (DEBUG == 1): print("Team name: %s, type: %s, location: %s"%(self.pntrtab.save_pntr.TEAMS[self.fnd_team][0], \
                         self.pntrtab.save_pntr.TEAMS[self.fnd_team][4],self.pntrtab.save_pntr.TEAMS[self.fnd_team][5]))
                 rx = (self.rrm+1)*50
@@ -92,18 +92,32 @@ class PaintTable(QtWidgets.QTableWidget):
                   rx = (self.rrm-3)*50
                 self.pntrtab.tableWidget2.move((self.ccm+1)*275, rx)
                 iz = (0, 4, 5)  ## name, type, location
-#                
-###  DO NOT need to flip meaning of table2 cells anymore
-#
                 for i in range(0,3):
                   iz0 = iz[i]  
                   item = QtWidgets.QTableWidgetItem(self.pntrtab.save_pntr.TEAMS[self.fnd_team][iz0])
                   self.pntrtab.tableWidget2.setItem(i,1,item)
                 ## using tablewidget2
                 self.pntrtab.tableWidget2.show()
-              elif (self.ccm >= self.pntrtab.Nunas_col and self.pntrtab.tableWidget.item(self.rrm,self.ccm).text() == " " \
-                          and self.ccm == self.pntrtab.Nsets-1):  ## presently only last column, and blank
-              ## create a group <from list> (check to see if already exists)
+              elif (self.pntrtab.tableWidget.item(self.rrm,self.ccm).text() != " "):  ## SEARCHER ENTRY
+                ## should be a searcher entry
+                self.fnd_srchr = tabinfo.fndloc(self, self.pntrtab.save_pntr.SRCHR, 4, 3, self.rrm, self.ccm)
+                rx = (self.rrm+1)*50
+                if (self.rrm > self.pntrtab.Nrows-4):
+                  rx = (self.rrm-3)*50
+                self.pntrtab.tableWidget5.move((self.ccm+1)*275, rx)
+                iz = (0, 2, 10, 11)  ## name, ID, cell#, resources
+                for i in range(0,5):
+                  if (i != 4):      
+                      iz0 = iz[i]  
+                      item = QtWidgets.QTableWidgetItem(self.pntrtab.save_pntr.SRCHR[self.fnd_srchr][iz0])
+                  else:
+                      item = QtWidgets.QTableWidgetItem(" ")
+                  self.pntrtab.tableWidget5.setItem(i,1,item)           
+                ## using tablewidget5
+                self.pntrtab.tableWidget5.show()  
+              elif (self.pntrtab.tableWidget.item(self.rrm,self.ccm).text() == " " and self.ccm == self.pntrtab.Nsets-1):
+                                             ## presently only last column, and blank
+                ## create a group <from list> (check to see if already exists)
                 if (DEBUG == 1): print("Found GROUP location")
                 cx = (self.ccm+1)*275
                 rx = (self.rrm+1)*50
@@ -119,7 +133,6 @@ class PaintTable(QtWidgets.QTableWidget):
                     ##     Find searcher ID#, Agency Name, then change color or found names
               self.pntrtab.tableWidget4.move(1000,1000)  # near center
               self.pntrtab.tableWidget4.show() 
-              print("In out of bounds RMB")
         ## below, need QtWidgets.QTableWidget to set proper type for event     
         super(QtWidgets.QTableWidget,self).mousePressEvent(e)  ## allow rest of 'click' event to process
 
@@ -161,11 +174,11 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
     Nrows = 30   
     Nsets = 11
     Nunas_col = int(Nsets/2)+1   ## presently 6
-    sarID = 1                    ### QtWidgets.QLineEdit()  HOW to access variable defined down inside??
+    sarID = 1                    
     DISPLAY_LOCK = 0
     TabYoff=0
     save_pntr=0
-    keyBrd = 1    ## 1 is numeric, 0 is alpha
+    keyBrd = 1                   ## 1 is numeric, 0 is alpha
     saveLastIDentry = ""
     clr_order = "RGBYMC "
     def setupUi(self, MainWindow):
@@ -225,36 +238,54 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         self.tableWidget2.horizontalHeader().hide()
         self.tableWidget2.verticalHeader().hide()        
         self.tableWidget2.hide()
+        ##  activated by RMB for Searcher entry detail
+        self.tableWidget5 = PaintTable(self.centralwidget)  ## secondary small table above primary table
+        self.tableWidget5.setGeometry(QtCore.QRect(400, 520, 400, 400))
+        self.tableWidget5.setRowCount(6)
+        self.tableWidget5.setColumnCount(2)
+        self.tableWidget5.setRowHeight(3,100)  ## more room for resources
+        self.tableWidget5.setObjectName("tableWidget5")
+        items = ("Name", "ID", "Cell#", "Resources", "Remove? (y, N)", "        Ok", "      Cancel")
+        for i in range(0,7):
+          item = QtWidgets.QTableWidgetItem(items[i])
+          item.setFlags(Qt.ItemIsEnabled)      # protected
+          if (i < 6): self.tableWidget5.setItem(i,0,item)
+          else:       self.tableWidget5.setItem(5,1,item)
+        self.tableWidget5.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tableWidget5.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tableWidget5.horizontalHeader().hide()
+        self.tableWidget5.verticalHeader().hide()        
+        self.tableWidget5.hide()
         #  from RMB in Groups column
         self.tableWidget3 = PaintTable(self.centralwidget)  ## secondary small table above primary table
-        self.tableWidget3.setGeometry(QtCore.QRect(400, 520, 200, 250))
-        self.tableWidget3.setRowCount(4)
+        self.tableWidget3.setGeometry(QtCore.QRect(400, 520, 200, 350))
+        self.tableWidget3.setRowCount(6)
         self.tableWidget3.setColumnCount(1)
         self.tableWidget3.setObjectName("tableWidget3")
-        itemxs = ("K9", "Nordic", "SnowMobile", "allow choice?")
-        for i in range(0,4):
+        itemxs = ("K9", "Nordic", "SnowMobile", "Unavail","<create>","     Ok")
+        for i in range(0,6):
           item = QtWidgets.QTableWidgetItem(itemxs[i])
-          item.setFlags(Qt.ItemIsEnabled)    # protected
+          if (i != 4): item.setFlags(Qt.ItemIsEnabled)    # protected; <create> not protected
           self.tableWidget3.setItem(i,0,item)
         self.tableWidget3.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget3.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget3.horizontalHeader().hide()
         self.tableWidget3.verticalHeader().hide()        
         self.tableWidget3.hide()
-        ##  activated by RMB for out-of-bounds
+        ##  activated by RMB for out-of-bounds FIND
         self.tableWidget4 = PaintTable(self.centralwidget)  ## secondary small table above primary table
-        self.tableWidget4.setGeometry(QtCore.QRect(400, 520, 400, 250))
-        self.tableWidget4.setRowCount(4)
+        self.tableWidget4.setGeometry(QtCore.QRect(400, 520, 400, 360))
+        self.tableWidget4.setRowCount(6)
         self.tableWidget4.setColumnCount(2)
-        self.tableWidget4.setObjectName("tableWidget2")
-        items = ("           Find", "SearcherID", "Agency", "        Ok", "      Cancel")
-        for i in range(0,5):
+        self.tableWidget4.setObjectName("tableWidget4")
+        items = ("           Find", "SearcherID", "SearcherName", "Agency", "Resource Type", "        Ok", "      Cancel")
+        for i in range(0,7):
           item = QtWidgets.QTableWidgetItem(items[i])
           item.setFlags(Qt.ItemIsEnabled)     # protected
-          if (i < 4):
+          if (i < 6):
             self.tableWidget4.setItem(i,0,item)
-            if (i < 3): self.tableWidget4.setItem(i,1,QtWidgets.QTableWidgetItem(" "))
-          else:       self.tableWidget4.setItem(3,1,item)
+            if (i < 5): self.tableWidget4.setItem(i,1,QtWidgets.QTableWidgetItem(" "))
+          else:       self.tableWidget4.setItem(5,1,item)
         self.tableWidget4.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget4.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableWidget4.horizontalHeader().hide()
@@ -265,7 +296,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         item = QtWidgets.QTableWidgetItem()   ##  How to set all cells to a default font
         font = QtGui.QFont()
         font.setPointSize(Tpoint)
-        self.tableWidget.setFont(font)  ## ?
+        self.tableWidget.setFont(font)  
         item.setFont(font)
         self.tableWidget.setItem(0, 0, item)
         ##
@@ -378,6 +409,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
     
 
+                
     def setKeys(self, n):  ## keys for searcher ID entry
         _translate = QtCore.QCoreApplication.translate
         if (n == 1):  # numbers
@@ -432,7 +464,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         self.setKeys(self.keyBrd)
 
       
-    def dragMoveEvent(self, e):  # do I need this?
+    def dragMoveEvent(self, e):  
         e.accept(QtCore.QRect(0,0,3000,1800))  ##QRect for moves
         # do not print("in move") from here; will get many
 
@@ -440,7 +472,7 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
 
     def dragEnterEvent(self, e):  ## redefined event
       ##
-      self.DISPLAY_LOCK = 1  
+      self.DISPLAY_LOCK = 1  ## using?
 ##  TRYING to adjust position of table widget
 ##### test area        
 ##   
@@ -458,14 +490,8 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
         self.cc = index.column()
 
         ## need to convert to text, as value@pointer disappears while dragging
-###
-#    Instead of changing a location (below) in the display from and to, just p/u the location,
-#        Convert to pntr and match to lin array entry.  Then update the entries in
-#        the lin array and re-display.  (use tabmove/tabload??)
-###
       else :
         e.ignore()
-        #$#print("Ignore drag enter")
         
 
     def dropEvent(self, e):  ## redefined event
@@ -477,9 +503,9 @@ class Ui_MainWindow(object):     #QtWidgets.QTableWidget
          self.cc2 = index2.column()
          if (self.rr2 > 0):
           e.accept()
-          vxy = QtCore.QPoint()    ## does not appear to be used?
-          vxy.setX(position2.x())   ## e.pos().x().toInt())
-          vxy.setY(position2.y()-self.TabYoff)        
+          ##vxy = QtCore.QPoint()    ## does not appear to be used?
+          ##vxy.setX(position2.x())   ## e.pos().x().toInt())
+          ##vxy.setY(position2.y()-self.TabYoff)        
           #self.button.move(position)
           e.setDropAction(QtCore.Qt.CopyAction)  ## can affect the value at the orig loc
           if (DEBUG == 1): print("AT x placement error......")
@@ -509,9 +535,16 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         self.SAVE_FILE_PATH = "DATA\saveSEARCH"   ## changing save to JSON
         savelen = 5
         self.saveSet = 0
+        self.saveNames = ["A", "B", "C", "D", "E"]
         self.READIN = 0
-        self.findSrchrId = "0"   ## initialize find function
+        self.findSrchrId = "0"    ## initialize find function
         self.findAgncy = " "
+        self.findName = "xxx"
+        self.findResource = "xxx" # default, don't want a match to 'blank'
+        self.RemoteSignInMode = 0
+        self.RemoteLastRow = 0
+        self.pulsey = 0
+        self.pntrtab2 = 0
 
         self.TEAMS = []  ## teams DB 
         self.saveTeam = deque([],savelen)
@@ -529,15 +562,31 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         ## OLD: pntr is entry to display array = column# * rowMax + row#
         ## name at end of each list is "END"
 
+        ##self.time_chk()    ## start blinker timer - put this in addSrchr
+        self.masterBlink = 0
 
-    def tabload(self,xxx):  ## loads the screen table 
+    def time_chk(self):  ## possibly only run/restart when new user add by _addSrchr  
+        try:
+          yy = self.pntrtab2 
+          if (yy == 0): return
+          self.pulsey = 1 - self.pulsey
+          tabinfo.tabload(self,yy, 1)
+        finally:
+          if (self.masterBlink > 0):                     ## only starts timer when needed
+            self.masterBlink = self.masterBlink - 1  
+            QtCore.QTimer.singleShot(500, self.time_chk)
+
+
+    def tabload(self,xxx,fromWhat):  ## loads the screen table 
         ## initial load of display table from linear list (database)
         ## load columns, 1) have a blank between teams, 2) move to new column if a Team does not fit;
         ##                   does not apply to Unassigned
         ## in tablex2.Ui_MainWindow: Nrows and Nsets give the number of rows and column sets
-        ## locally ncol is current column
-        ##         nplace is row counter for current column
-        zz = Ui_MainWindow  
+
+        zz = Ui_MainWindow
+        #print("fromWhat %i"%fromWhat)
+        ## fromWhat Will allow no state saves when called for blinking
+        ###  possibly do not need to call tabload for blinking? Just update color for affected
 
         ##
         indk = [QtCore.Qt.red,QtCore.Qt.green,QtCore.Qt.blue,QtCore.Qt.yellow,QtCore.Qt.magenta,QtCore.Qt.cyan,QtCore.Qt.white]
@@ -545,38 +594,39 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         if (Ui_MainWindow.save_pntr == 0):
             Ui_MainWindow.save_pntr = self
             if (DEBUG == 1): print("setting save_pntr")
-        mam = str(self) ## pickup self value to see if we need to interchange self and xxx
+        mam = str(self)                 ## pickup self value to see if we need to interchange self and xxx
         if (mam.find("TableApp") > 0):  ## self has ptr that needs to be in xxx
             xxx = self
             self = Ui_MainWindow.save_pntr
             if (DEBUG == 1): print("interchanging xxx")
-        if (DEBUG == 1): print("xxx IS %s" % xxx)
+        if (DEBUG == 1): print("xxx IS %s, self is %s" % (xxx,self))
+        if (self.pntrtab2 == 0):  self.pntrtab2 = xxx   ## pntr to TableApp for use with blinker
         #### load titles
         if (DEBUG == 1): print("TABLEWIDGET %s"%xxx.tableWidget)
         xxx.tableWidget.inxt = 0  ## counter for team coord's
-        xxx.tableWidget.inxd = 0  ## counter for searcher coord's
+        xxx.tableWidget.inxd = 0  ## counter for searcher coord's for leader/medical dots
 
-        #self.saveTeam.append(list(self.TEAMS))            ## save for possible UNDO operation
-        #print("Previous Team: %s"%self.saveTeam)
-        self.saveTeam.append(copy.deepcopy(self.TEAMS))   # Using this instead
-        #print("Current Team: %s"%self.TEAMS)
-        self.saveSrchr.append(copy.deepcopy(self.SRCHR))  #  Need deepcopy for more complex structures
-        self.saveUnUsed.append(list(self.UNAS_USED))      #  depth of save's is set by savelen in tabinfo
-        self.saveMembers.append(copy.deepcopy(self.MEMBERS))
-        #print("SRin: %s"%self.SRCHR)
-        #print("SRsave1: %s"%self.saveSrchr)
-
+        if (fromWhat == 0):   ## do not store state if from blinker 
+          #self.saveTeam.append(list(self.TEAMS))            ## save for possible UNDO operation
+          #print("Previous Team: %s"%self.saveTeam)
+          self.saveTeam.append(copy.deepcopy(self.TEAMS))   # Using this instead
+          #print("Current Team: %s"%self.TEAMS)
+          self.saveSrchr.append(copy.deepcopy(self.SRCHR))  #  Need deepcopy for more complex structures
+          self.saveUnUsed.append(list(self.UNAS_USED))      #  depth of save's is set by savelen in tabinfo
+          self.saveMembers.append(copy.deepcopy(self.MEMBERS))
+          #print("SRin: %s"%self.SRCHR)
+          #print("SRsave1: %s"%self.saveSrchr)
 
         ##
 ## CLEAR entire table first        
         self.ncol = 0
-        self.nplace = 1
+        self.nplace = 0
         for ix in range(self.ncol, zz.Nsets):    
           for iy in range(self.nplace, zz.Nrows):        ##  cleanup
             xxx.tableWidget.setItem(iy, ix, QtWidgets.QTableWidgetItem(" "))       ## blanks - to b4 unassigned
         
         self.lin = 0
-        if (DEBUG == 1): print("In tabload %s %s %s" % (Ui_MainWindow.save_pntr, self, xxx))
+        if (DEBUG == 1): print("In tabload1 %s %s %s" % (Ui_MainWindow.save_pntr, self, xxx))
 ## FIRST run thru TEAMS
         if (DEBUG == 1): print("TeamZ: %s"% self.TEAMS[self.lin])
         text = self.TEAMS[self.lin][0]
@@ -595,19 +645,10 @@ class tabinfo(object):  ## table operations: tabload and tabmove
    ##  Change sections to put entries into (Overhead, Teams-Assigned, UnAssigned:tflag0,1,2))
 
           rowy = self.TEAMS[self.lin][2]    ## rows         
-          colx = self.TEAMS[self.lin][1]         
-          ### print("At team %i %i %i %i" % (zz.Nrows,self.nplace, self.ncol,self.TEAMS[self.lin][3]))  
-          if (self.TEAMS[self.lin][3] > (zz.Nrows - self.nplace-1) and self.TEAMS[self.lin][3] <= zz.Nrows) : # does not fit
-              #@for m in range(self.nplace,zz.Nrows):
-              #@  xxx.tableWidget.setItem(m, self.ncol, QtWidgets.QTableWidgetItem(" "))  ## blanks - need aux columns
-              self.nplace = 1              ## place in next column
-              self.ncol = self.ncol + 1  
-          elif ((zz.Nrows - self.nplace) > 1 and self.nplace != 0):  ## leave a blank cell between teams 
-              #@xxx.tableWidget.setItem(self.nplace, self.ncol, QtWidgets.QTableWidgetItem(" "))  ## blanks - need aux columns  
-              self.nplace = self.nplace + 1
-              fnt = fntBold
-              color = QtCore.Qt.magenta
-              #@#  add stuff to painter list - rounded rectangles
+          colx = self.TEAMS[self.lin][1]
+          fnt = fntBold                 ## for team headers
+          color = QtCore.Qt.magenta
+          ##  add stuff to painter list - rounded rectangles
           if (colx != Ui_MainWindow.Nunas_col and rowy != 0): ## Don't place UnAssigned header
               xxx.tableWidget.coordxp[xxx.tableWidget.inxt] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyp[xxx.tableWidget.inxt] = xxx.tableWidget.rowViewportPosition(rowy)
@@ -633,50 +674,63 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         self.lin = 0      
         text = self.SRCHR[self.lin][0]
         fnt = fntSmall2
-        color = QtCore.Qt.green
+        color = QtCore.Qt.blue
         colorB = QtCore.Qt.yellow
+        colorX = QtCore.Qt.magenta
         while (text != "END"):
             rowy = self.SRCHR[self.lin][4] % zz.Nrows          
             colx = self.SRCHR[self.lin][3]         
-            if (self.SRCHR[self.lin][8] == "1"):   ## MED?
+            if (self.SRCHR[self.lin][8] == "1"):   ## MEDICAL
               xxx.tableWidget.coordxd[xxx.tableWidget.inxd] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyd[xxx.tableWidget.inxd] = xxx.tableWidget.rowViewportPosition(rowy)
               xxx.tableWidget.type[xxx.tableWidget.inxd] = 1
               xxx.tableWidget.inxd = xxx.tableWidget.inxd + 1
-            if (self.SRCHR[self.lin][7] == "1"):   ## LEADER?   #### need to differentiate between these with diff COLOR
+            if (self.SRCHR[self.lin][7] == "1"):   ## LEADER   #### need to differentiate between these with diff COLOR
               xxx.tableWidget.coordxd[xxx.tableWidget.inxd] = xxx.tableWidget.columnViewportPosition(colx)
               xxx.tableWidget.coordyd[xxx.tableWidget.inxd] = xxx.tableWidget.rowViewportPosition(rowy)
               xxx.tableWidget.type[xxx.tableWidget.inxd] = 2
               xxx.tableWidget.inxd = xxx.tableWidget.inxd + 1              
-            if (self.ncol < zz.Nsets-1):  ## temporary check to make sure displayable column(not past last), if not, skip...
-              xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(f"{text[:13]:<13}"+" "+self.SRCHR[self.lin][1]))
-              xxx.tableWidget.item(rowy, colx).setFont(fnt)
-              xxx.tableWidget.item(rowy, colx).setForeground(color)
-              if ((self.SRCHR[self.lin][2] == self.findSrchrId or self.findSrchrId == " " or len(self.findSrchrId) == 0) \
-                   and self.SRCHR[self.lin][1] == self.findAgncy):
-                xxx.tableWidget.item(rowy, colx).setBackground(colorB)
-              if (colx >= Ui_MainWindow.Nunas_col and colx < zz.Nsets-1):   ## set used for locations in unassigned
-                 npt = rowy + (colx - Ui_MainWindow.Nunas_col)*Ui_MainWindow.Nrows
-                 self.UNAS_USED[npt] = 1         ## set position
+
+            xxx.tableWidget.setItem(rowy, colx, QtWidgets.QTableWidgetItem(f"{text[:13]:<13}"+" "+self.SRCHR[self.lin][1]))
+            xxx.tableWidget.item(rowy, colx).setFont(fnt)
+ #####  Blinking          
+            if (self.SRCHR[self.lin][9] != 0 and self.pulsey == 1):  ## Blinker for new searcher add            
+                xxx.tableWidget.item(rowy, colx).setForeground(colorX)
+                self.SRCHR[self.lin][9] = self.SRCHR[self.lin][9] - 1
+            else:
+                xxx.tableWidget.item(rowy, colx).setForeground(color)
+ #####  Find - change background    FIND
+            if  (self.SRCHR[self.lin][0].upper().find(self.findName.upper()) != -1):  
+                 xxx.tableWidget.item(rowy, colx).setBackground(colorB)   
+            if  (self.SRCHR[self.lin][11].upper().find(self.findResource.upper()) != -1):  
+                 xxx.tableWidget.item(rowy, colx).setBackground(colorB)   
+            if ((self.SRCHR[self.lin][2] == self.findSrchrId or self.findSrchrId == " " or len(self.findSrchrId) == 0) \
+                and self.SRCHR[self.lin][1] == self.findAgncy and self.findResource != "xxx" and self.findName != "xxx"):   
+                xxx.tableWidget.item(rowy, colx).setBackground(colorB)      ## change background when using find             
+            if (colx >= Ui_MainWindow.Nunas_col and colx < zz.Nsets-1):     ## set used for locations in UNASsigned
+                npt = rowy + (colx - Ui_MainWindow.Nunas_col)*Ui_MainWindow.Nrows
+                self.UNAS_USED[npt] = 1         ## set position
             self.lin = self.lin + 1
             text = self.SRCHR[self.lin][0]    ## next slot name to use
         #### end of SRCHR while
         
 
 #### JSON write of data alternating to A and B filesets (in case one gets corrupted while writing)
-    ##   possibly will keep a save (with time stamp) every so-many minutes for history?      
-        setName = "A"  
-        if (self.saveSet == 0):
-            setName = "B"
-        self.saveSet = 1 - self.saveSet
-        if (self.READIN == 1):
+    ##   possibly will keep a save (with time stamp) every so-many minutes for history?
+
+####    Don't do this every tick of Blinking ...
+        if (fromWhat == 0 and self.READIN == 1):    ## don't do when = 1, is blinker AND until READMEMB is active 
+          self.saveSet = self.saveSet + 1
+          if (self.saveSet == 5): self.saveSet = 0
+          setName = self.saveNames[self.saveSet]
           if (DEBUG == 1): print("SAVE files %i"%self.saveSet)
           with open("DATA\saveAll"+setName+".json", 'w') as outfile:  ## opens, saves, closes
-            json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM], outfile) ## save TEAMS and TEAM_NUM
+            json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM, self.RemoteSignInMode, \
+                                self.RemoteLastRow], outfile) ## save TEAMS, SRCHR, MEMBERS and TEAM_NUM, Remote info
           ## have another thread started to copy the last file written to another machine
 ##
 #####      May want to add a periodic Keep set, say every 10min or so          
-##            
+##  
           bg = AsyncCopy("DATA\saveAll"+setName+".json","DATA2\saveAll"+setName+".json")
           bg.start()
           ##bg.join()   ## would cause the main thread to wait              
@@ -685,12 +739,11 @@ class tabinfo(object):  ## table operations: tabload and tabmove
     def fndloc(self, xlist, posr, posc, r, c):
         ## routine to find the location of a team or srchr in its database
         #  xlist is either TEAMS or SRCHR DB
-        #  posr and posc are array position in the given 'xlist' type for the row and col info
+        #  posr and posc are position in the list for the given 'xlist' type of the row and col info
         #  r and c are the row and col that are being matched
         #  fnd returned is the pointer into the 'xlist' database
         fnd = -1
         #print("FNDLOC %i %i %i %i %i" % (len(xlist),r,c,posr,posc))
-        #for xxx in range(0,xlist.index(["END"])): print("xx %s %s" % (xlist[xxx], xlist[0][3]))
 
         for t in range(0, xlist.index(["END"])):    ## stop prior to END
           #print(" %i,%i"%(xlist[t][posr],xlist[t][posc]))
@@ -713,7 +766,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         ##print("END PLACE %i" % xxx)
 
         for s in range(0, self.SRCHR.index(["END"])):  #### STOP at "END"? try: self.SRCHR.index("END")+1
-          #$#print("SRCH: %i,%i:%i,%i::%i,%i" %(t_row,t_col,self.SRCHR[s][6],self.SRCHR[s][5],self.SRCHR[s][4],self.SRCHR[s][3]))                                                 ##   OR self.SRCHR[0].index("END")+1
+                                                          ##   OR self.SRCHR[0].index("END")+1
           if (t_row == self.SRCHR[s][6] and t_col == self.SRCHR[s][5]):
             srch_list[self.SRCHR[s][4] - t_row - 1] = s  ## ordered (by row under team header) list of searchers in team
             ix = ix + 1
@@ -840,8 +893,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         if (DEBUG == 1): print("xt %i, %i" % (fnd_from_t,fnd_to_t))
 ## MOVE TEAM logic
         if (fnd_from_t != -1):     # from is pointing to team
-          if (colf == 0):
-            return                 ## don't move team if in column 0
+          if (colf == 0 or (colf == ww.Nunas_col and rowf == 1)): return   # don't move team in col 0 or Unassigned header 
           else:          
             if (fnd_to_t != -1 and fnd_to_t != fnd_from_t):   # to is pointing to team; not same location
                 ## add members to new team, inc count of srchrs, remove from-team (unless to is unassigned)
@@ -977,7 +1029,16 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     winsound.Beep(2500, 1200)  ## BEEP, 2500Hz for 1 second, needs to be empty                    
                     if (DEBUG == 1): print("BEEP3")     # needs to be empty location
                     return        
-                else:  ## to is in team area   
+                else:  ## to is in team area
+                    if (calc_from_t == calc_to_t):   # make correction for same team srchr movement
+                        print("same team srchr move")
+                        rowt = rowt - 1     # don't move down by 1
+                    #
+                    # if moving a leader to a srchr of a team promote to first position if that position
+                    #   is not already held by a leader
+                    if (zz.SRCHR[fnd_from_s][7] == "1"):      # this is a leader
+                        if (zz.SRCHR[srch_to[0]][7] != "1"):  # first srchr is not already a leader
+                            rowt = zz.SRCHR[srch_to[0]][6]    # change to-row to the row of team header
                     if (colf < ww.Nunas_col):   ## not for moving from-srchr if in unas
                       m = 0
                       for ixx in range(0,zz.TEAMS[calc_from_t][3]):
@@ -1025,7 +1086,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                       ## add 1 to rowt to move the 'next' existing srchr down by 1                     
                       if (rowt+1 == zz.SRCHR[srch_to[ixx]][4] or m == 1): ## move to-searchers down by 1
                         m = 1
-                        zz.SRCHR[srch_to[ixx]][4] = zz.SRCHR[srch_to[ixx]][4]+1  ## move down a row (only 1 mover)  OKAY?
+                        zz.SRCHR[srch_to[ixx]][4] = zz.SRCHR[srch_to[ixx]][4]+1  ## move down a row (only 1 mover)
                     zz.TEAMS[calc_to_t][3] = zz.TEAMS[calc_to_t][3]+1  ## add 1 to team
                     if (zz.TEAMS[calc_from_t][3] == 1 and colf > 0 and colf < ww.Nunas_col): # only if in TEAM area
                         setDeleteTeam = 2
@@ -1158,13 +1219,14 @@ class tabinfo(object):  ## table operations: tabload and tabmove
                     zz.SRCHR[fnd_from_s][5] = colt
                     zz.SRCHR[fnd_from_s][6] = rowt               ## can this be in unassigned area??? do not think so
                     zz.SRCHR[fnd_from_s][4] = rowt + 1
-##  Need to add check that room exists in column or to next team in the column, if not do a BEEP?
+##  Need to add check that room exists in column or to next team in the column, if not do a BEEP
 
         #print("WOW: %s"%zz.saveTeam)  
-        if (DEBUG == 1): print("end tabmove2 %s" % zz)       
-        tabinfo.tabload(self,zz)       ## overload display table        
+        if (DEBUG == 1): print("end tabmove2 %s" % zz)
+        tabinfo.tabload(self,zz,0)       ## overload display table
         if (DEBUG == 1): print("Pre update2")
-        self.update()                  ## is this a function of printEvent?
+        self.update()                    ## is this a function of printEvent?
+        ##QtGui.QGuiApplication.processEvents() #update gui for pyqt
         if (DEBUG == 1): print("Post update2")
                
 
