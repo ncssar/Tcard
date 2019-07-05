@@ -17,6 +17,7 @@ import time
 from collections import deque  ## provides for faster copy operations than a normal list
 import copy                    ## using deepcopy for copying complex lists
 import csv
+import os
 import json
 from datetime import date, datetime
 import threading
@@ -33,22 +34,20 @@ fntField = QFont("Times", 16, QtGui.QFont.Bold)
 
 class AsyncCopy(threading.Thread): 
 
-	def __init__(self, infile, out): 
+    def __init__(self, infile, out): 
+      # calling superclass init 
+      threading.Thread.__init__(self) 
+      self.infile = infile 
+      self.out = out 
 
-		# calling superclass init 
-		threading.Thread.__init__(self) 
-		self.infile = infile 
-		self.out = out 
-
-	def run(self): 
-
-          f = open(self.infile, "r") 
-          temp = json.load(f)
-          f.close()
-          f = open(self.out, "w")
-          json.dump(temp,f)
-          f.close()
-          if (DEBUG == 1): print("Finished background file copy")
+    def run(self): 
+      f = open(self.infile, "r") 
+      temp = json.load(f)
+      f.close()
+      f = open(self.out, "w")
+      json.dump(temp,f)
+      f.close()
+      if (DEBUG == 1): print("Finished background file copy")
 								
 
 
@@ -68,7 +67,7 @@ class PaintTable(QtWidgets.QTableWidget):
         self.coordyd = [w for w in range(200)]
         self.type = [u for u in range(200)]
         
-    def mousePressEvent(self, e):  ## redefined event (for RMB push)
+    def mousePressEvent(self, e):  ## redefined event (to include operation of RMB push)
         if (DEBUG == 1): print("SELF: %s" % self.pntrtab)
         ##QtWidgets.QPushButton
         if e.button() == QtCore.Qt.LeftButton:
@@ -542,9 +541,10 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         self.findName = "xxx"
         self.findResource = "xxx" # default, don't want a match to 'blank'
         self.RemoteSignInMode = 0
-        self.RemoteLastRow = 0
         self.pulsey = 0
         self.pntrtab2 = 0
+        self.lastTime = 0
+        self.TApntr = 0
 
         self.TEAMS = []  ## teams DB 
         self.saveTeam = deque([],savelen)
@@ -552,7 +552,8 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         self.saveSrchr = deque([],savelen)
         self.MEMBERS = []   ##  All NC SAR and OTHERS members 
         self.saveMembers = deque([],savelen)
-        self.UNAS_USED = [0 for x in range(zz.Nrows*(Ui_MainWindow.Nsets-zz.Nunas_col))]  ## =1 if occupied; ptr = (col-Nunas_col)*Nrows + row
+        self.UNAS_USED = [0 for x in range(zz.Nrows*(Ui_MainWindow.Nsets-zz.Nunas_col))]
+                                                    ## =1 if occupied; ptr = (col-Nunas_col)*Nrows + row
         self.saveUnUsed = deque([],savelen)
 
         ##self.SRCHR = [[0 for x in range(self.NinfoSrchr)] for y in range(self.Nsrchr)]
@@ -574,7 +575,30 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         finally:
           if (self.masterBlink > 0):                     ## only starts timer when needed
             self.masterBlink = self.masterBlink - 1  
-            QtCore.QTimer.singleShot(500, self.time_chk)
+            QtCore.QTimer.singleShot(500, self.time_chk)  ## 500 msec
+
+
+
+    def srchr_chk(self, yy):  ## possibly only run/restart when new user add by _addSrchr
+            ##   FOR remote user entry
+        try:                               # normal operation
+          mam = str(yy)           # check pntr
+          if (mam.find("TableApp") > 0):
+            self.TApntr = yy
+            print("save pntr, mam=%s"%mam)
+          else: return
+          #  check if modified date changed on interface file
+          ####server = "\\192.168.1.20\c:\signin_files\"
+          server = "c:\\signin_files\\"
+          mtime = os.path.getmtime(server + "REMOTE_SIGN_IN" + ".csv")  ## file modified time
+          if (mtime != self.lastTime): 
+          #     if so, call routine to process new information
+            self.lastTime = mtime      # update time
+            print("call to rmtInProcess")
+            self.TApntr.rmtInProcess()
+        finally:                           # done when the above is complete 
+          QtCore.QTimer.singleShot(30000, lambda: self.srchr_chk(yy))  ## 30 sec, use lambda to pass argument
+
 
 
     def tabload(self,xxx,fromWhat):  ## loads the screen table 
@@ -584,7 +608,7 @@ class tabinfo(object):  ## table operations: tabload and tabmove
         ## in tablex2.Ui_MainWindow: Nrows and Nsets give the number of rows and column sets
 
         zz = Ui_MainWindow
-        #print("fromWhat %i"%fromWhat)
+        ## print("fromWhat %i"%fromWhat)
         ## fromWhat Will allow no state saves when called for blinking
         ###  possibly do not need to call tabload for blinking? Just update color for affected
 
@@ -725,8 +749,8 @@ class tabinfo(object):  ## table operations: tabload and tabmove
           setName = self.saveNames[self.saveSet]
           if (DEBUG == 1): print("SAVE files %i"%self.saveSet)
           with open("DATA\saveAll"+setName+".json", 'w') as outfile:  ## opens, saves, closes
-            json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM, self.RemoteSignInMode, \
-                                self.RemoteLastRow], outfile) ## save TEAMS, SRCHR, MEMBERS and TEAM_NUM, Remote info
+            json.dump([self.TEAMS, self.SRCHR, self.MEMBERS, self.UNAS_USED, self.TEAM_NUM, \
+                       self.RemoteSignInMode], outfile) ## save TEAMS, SRCHR, MEMBERS and TEAM_NUM, Remote info
           ## have another thread started to copy the last file written to another machine
 ##
 #####      May want to add a periodic Keep set, say every 10min or so          

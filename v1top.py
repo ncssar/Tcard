@@ -9,6 +9,7 @@ from pathlib import Path
 import winsound
 import re
 import json
+from operator import rshift
 from collections import deque   ## pronounced deck
 global DEBUG
 
@@ -24,6 +25,7 @@ fntField.setBold(True)
 import os  # For listing directory methods
 import time
 import io
+import glob
 import traceback
 import threading
 from datetime import date, datetime
@@ -144,15 +146,15 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
           ##print("Call to func")
         ##self.num = 1
         self.stop = datetime_update(self)  ## start timer
-        self.num = 0
-        ##self.stop.set()        ## will stop timer
-        
-        @setInterval(30)         ## 30 seconds to recheck members file update
-        def chk_new_srchr(xxx):  ## checks for update of searchers new/remove
-            self.num = self.num+1
-            self.mm.infox.setText("30 sec timer count: "+str(self.num))
-        #
-        ##self.stop2 = setInterval(chk_new_srchr(self))   # start timer2
+        ###self.num = 0
+        #####self.stop.set()        ## will stop timer
+        ###
+        ###@setInterval(30)         ## 30 seconds to recheck members file update  CHECK??
+        ###def chk_new_srchr(xxx):  ## checks for update of searchers new/remove
+        ###    self.num = self.num+1
+        ###    self.mm.infox.setText("30 sec timer count: "+str(self.num))
+        ####
+        #####self.stop2 = setInterval(chk_new_srchr(self))   # start timer2
         #
 
         ###  The following does not appear to have an affect
@@ -167,7 +169,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
 #
 #  list SRCHR : [Name, agency, idnumb, xloc, yloc, xteam, yteam, leader (bit), medical (bit), Blink, Cell#, Resources]
 #
-#  list MEMBERS:[Name, IDval, Agncy, leader, medical, TimeIN, TimeOUT, Cell#, Resources, CumTime]  (use TimeIn != "-1" as checked-in)
+#  list MEMBERS:[Name, IDval, Agncy, leader, medical, TimeIN, TimeOUT, Cell#, Resources, CumTime]  (use TimeIn != "-1" ? as checked-in)
 #                                         Want to add total time field for multiple time segments
 #
 # preset values  for each type
@@ -260,7 +262,9 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         colu = int(ixx/yy.Nrows)
         rowu = ixx - colu * yy.Nrows
         colu = colu + yy.Nunas_col
-        TimeIN = time.time()
+        TimeIN = time.time()    ## time since epoch
+        tx = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        print("%f:%s"%(TimeIN,tx))
         if (DEBUG == 1): print("TimeIN %i"% TimeIN)  ## If the srchr comes back how to accum time? In members
         zz.SRCHR.insert(-1,[zz.MEMBERS[memPtr][0],zz.MEMBERS[memPtr][2],zz.MEMBERS[memPtr][1],  \
                         colu, rowu, yy.Nunas_col, 1, zz.MEMBERS[memPtr][3], zz.MEMBERS[memPtr][4], 5, \
@@ -281,8 +285,9 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
         yy.saveLastIDentry = yy.sarID.text()
         yy.sarID.setText("")  ## clear sarID field
         if (DEBUG == 1): print("PTR2 %s"%yy)
-        zz.masterBlink = 10      ## set time for blinker to run until restarted
+        zz.masterBlink = 10      ## set time for blinker to run until restarted 10 * 0.5 = 5sec
         zz.time_chk()            ## start blinker clock
+        ##print("SRCHR chk2: %s"%zz.SRCHR)  
         zz.tabload(yy,0)         ## load display table
 
 
@@ -452,7 +457,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             if (DEBUG == 1): print("JSON found")
             mt1 = 0
             for m in range(0,5):    # find most recent saved state file
-              mtime = os.path.getmtime("DATA\saveAll"+zz.saveNames[m]+".json")
+              mtime = os.path.getmtime("DATA\saveAll"+zz.saveNames[m]+".json")  ## file modified time
               if (mtime > mt1):
                   mt1 = mtime
                   mpnt = m
@@ -462,42 +467,212 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
             print("Set: %s"%setName)
             zz.READIN = 1   ## set as having read members in
             try:
-              with open("DATA\saveAll"+setName+".json", 'r') as infile:  ## opens, reads, closes
-                [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM, zz.RemoteSignInMode, \
-                                                                     zz.RemoteLastRow] = json.load(infile)   
+              with open("DATA\saveAll" + setName + ".json", 'r') as infile:  ## opens, reads, closes
+                [zz.TEAMS, zz.SRCHR, zz.MEMBERS, zz.UNAS_USED, zz.TEAM_NUM, \
+                    zz.RemoteSignInMode] = json.load(infile)   
               print("Doing recovery reload...")    
               zz.tabload(yy,0)
             except:
               print("Bad JSON save file, try other version")
               winsound.Beep(2500, 1200)       ## BEEP, 2500Hz for 1 second, needs to be empty
         else:   # MUST be REMOTE  will check every so many seconds and see if file time-modified is updated
+                #  So need timer to call routine to check if interface file modify time has changed.
             pass
             zz.RemoteSignInMode = 1
+            self.priorRead = []
+            print("AT remote: %s %s %s"%(self,yy,zz))
+            zz.srchr_chk(yy)           ## start checking for remote entry updates
+
+            
+    def rmtInProcess(self):    
+            ########### PUT the following in a routine called by timer
             ###   Start timer above
-            ##  Enable check remote sign-in timer here; In timer routine check time modified and if so, do...
-            ##     since timer is a separate thread need to be careful (have a LOCK? when in tabmove2?) when updating
-            ##     SRCHR and TEAMS.  Should not be an issue with MEMBERS db.
+            ##  Enable check remote sign-in timer above; In timer routine check time modified and if so, do...
+ 
+        ##*SARID, "NAME(LAST,FIRST)", AGENCY, RESOURCES, TIME-IN(HUMAN), TIME-OUT, TIME-DELTA, TIME-IN(EPOCH FLOAT),
+        ##         TIME-OUT, TIME-DELTA, CELL#, "STATUS(SignIn, SignOut, OnTcard, RmTcard)"
+        
+        ##     Status exchange: SignIn from Sign-in program, acknowledge by OnTcard from Tcard
+        ##                      then, RmTcard from Tcard enabling SignOut at Sign-Out
+        ##     When Tcard sees Sign-In checks for a MEMBERS entry from a previous participation, if found update
+        ##          sign-in and sign-out times. Delta will accumulate. Also, create a SRCHR entry
+        ##          Then update the remote file status to OnTcard and write file.  Also change priorRead db status, too     
+        ##     When a member tells Tcard they are leaving, Tcard removes the SRCHR entry, updates the MEMBERS entry to
+        ##          set the time-out and delta times.  Then the status is changed to RmTcard in the current and priorRead
+        ##          db's and the remote file is written.
+            yy = self.mm
+            zz = self.zz2
+            team_unas = 6                    ####   This is the number of the entry for the Unassigned Team
+                                             ##         This may change as default or over time
+
             print("At Remote sign-in")
-### following s/b in timer section?   
-            irow = 0
-            #with open('REMOTE_SIGN_IN.csv','rt') as csvIN2:
-            #  csvPtr = csv.reader(csvIN2, dialect='excel')
-            #  for row in csvPtr:
-            #      irow = irow + 1
-            #      if (irow <= zz.RemoteLastRow): continue  ## skip lines already processed
-            #      row = [row[0],row[1],row[2],row[3],row[4],row[5], "0"]  ## add position for check-in time, maybe one for time-out?
-            #      ifnd = 0
-                  ## save pointer to last record to be able to skip down to first 'new' (will save value for
-                  ##    possible recovery.  Also, need to save flag that system is in REMOTE sign-in mode
-                  ## move down file to first 'new' record.  Quick way to go to Nth row?
-            #      for ix in range(len(zz.MEMBERS)):          
-            #          if (row[1] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID,agency
-                      ## if does not exist -> add member and srchr in unassigned
-                          ## if exists and if time_out is set ->  set time_out in member and remove srchr
-                          ##    to remove searcher may have to first move to unassigned?
-                          ## if exists and time_out not set, ignore (since only looking at new records , this
-                          ##    should not happen; maybe put out message)
-            #  zz.RemoteLastRow = irow  # save updated row count
+            server = "c:\\signin_files\\"
+            lenPrior = len(self.priorRead)
+            rows = []
+            update = 0     # only reading remote file
+            deltaTime = 10 # number of seconds old is time stamp - must be rogue
+            
+## first scan members for searchers removed from Tcards
+      ## add code to check MEMBERS db for new Time-out (previous T/O # are negative)
+      ## If any found, change record status to RmTcard for each
+      ##  negate Time-out value in MEMBERS db
+            print('b4 look for rm members')
+            ifnd = 0         # indicates found at least one sign-out
+            rem = []
+            for ix in range(len(zz.MEMBERS)):
+                if (float(zz.MEMBERS[ix][6]) > 0):      # timeout set, so removed from Tcard
+                    rem.append(ix)               # create list of members to remove
+                    ifnd = ifnd + 1
+                    print("RM %i"%ix)
+            
+            print('b4 lock')
+    ### create file LOCK
+            while (1):                    
+                    curT = time.time()               # current time
+                    while (1):
+                        files = glob.glob(server + 'rmt_lock_*')
+                        if (len(files) == 0): break  # no lock files found
+                        for fi in files:
+                            strt = fi.find('#')+1
+                            fi_time = int(float(fi[strt:len(fi)]))
+                            if ((curT - fi_time) > deltaTime):         ## lock around too long
+                                #print("remove %f"%deltaTime)
+                                os.remove(fi)
+                    strCurT = str(curT)
+                    rand = int(strCurT[-1])          # use to get different delays
+                    time.sleep(rshift(rand,7))       # delay by rand/128 
+                    cname = os.environ['COMPUTERNAME']
+                    fx = open(server + 'rmt_lock_' + cname + '#' + strCurT, 'w+')  ## create lock
+                    fx.close()
+                    files = glob.glob(server + 'rmt_lock_*')   # find all lock files
+                    if (len(files) > 1):             # something else created a lock too
+                        os.remove(server + 'rmt_lock_' + cname + '#' + strCurT)  # back off
+                    else: break                      # only our lock; continue on    
+                 #  loop back
+   ###  end file lock
+            print('aftr lock')
+            print('List of removes %s'%rem)
+            irow = 0            
+            with open(server + 'REMOTE_SIGN_IN.csv','rt') as csvIN2:
+              csvPtr = csv.reader(csvIN2, dialect='excel', skipinitialspace=True)
+              print('open remote signin file')
+              for row in csvPtr:
+                  rows.append(row)   ## create rows list by combining each row
+                  irow = irow + 1    ### always read entire file comparing lines
+                  ##print('rowlong %s'%row)
+                  print("RMT row%i: %s, %s: lenP %i"% (irow,row[0],row[1],lenPrior))
+                  if (row[0][0] == "*"):
+                      continue             ## skip comment lines
+                  if (irow <= lenPrior):   # for existing lines, first compare to prior
+                      print("At compare")
+                      if (self.priorRead[irow-1] != row):
+                          print("Difference\n   %s\n   %s"%(self.priorRead[irow-1],row))    ## check for differences if name, sarid -> give error
+                          if (row[0] != self.priorRead[0] or row[2] != self.priorRead[2]):
+                              print("Error in remote file at %s"% row)
+                              winsound.Beep(2500, 300)           ## BEEP, short 2500Hz
+                              winsound.Beep(1000, 1200)          ## double
+                              winsound.Beep(2500, 300)
+                              break
+
+
+######check what should be the preset value for timeIn and Out a 0 or -1 from SignIn program ??
+                            
+                          ## check for change: timeout times, delta time and status s/b SignOut
+                          ##   if other changes issue warning
+                          # find MEMBERS entry
+                      else:  # indent fixer    
+                          memPtr = -1
+                          for ix in range(0,len(zz.MEMBERS)):
+                              print('ix=%i'%ix)
+                              if (row[0] == zz.MEMBERS[ix][1] and row[2] == zz.MEMBERS[ix][2]): ## match: ID, agency
+                                  memPtr = ix
+                                  print('MeM ptr %i'%memPtr)
+                                  break
+                          if (memPtr == -1):
+                              print("Record not found in MEMBERS: %s"% row)
+                              winsound.Beep(2500, 300)
+                              return                      ## record not found
+                          elif (memPtr in rem):           # did we find a member to be removed?
+                              rows[irow-1][11] = "RmTcard"
+                              zz.MEMBERS[memPtr][6] = -zz.MEMBERS[memPtr][6]     # negate as flag that sign-out has processed
+                              print("Update MEM for RM %i, irow %i"%(memPtr, irow))
+                          if (row[11] == "SignOut"):      ## completed signOut
+                              pass                        # should already have updated the following:
+                              #zz.MEMBERS[memPtr][6] = row[8]                           # timeout
+                              #zz.MEMBERS[memPtr][9] = zz.MEMBERS[memPtr][9] + row[9]   # delta time cum
+                          elif (row[11] == "SignIn"):     ## re-signIn    
+                              zz.MEMBERS[memPtr][5] = row[7]                           # timein
+                              zz.MEMBERS[memPtr][6] = -1                               # timeout
+                              #### create SRCHR entry
+                              ## find vacancy in UNAS_USED
+                              for ixx in range(2,len(zz.UNAS_USED)):
+                                  if ((ixx % yy.Nrows) == 0): continue   ## skip all rows == 0
+                                  if (zz.UNAS_USED[ixx] == 0):           ## found available location
+                                      zz.UNAS_USED[ixx] = 1
+                                      break
+                              colu = int(ixx/yy.Nrows)
+                              rowu = ixx - colu * yy.Nrows
+                              colu = colu + yy.Nunas_col
+                              zz.SRCHR.insert(-1,[zz.MEMBERS[memPtr][0],zz.MEMBERS[memPtr][2],zz.MEMBERS[memPtr][1],  \
+                                 colu, rowu, yy.Nunas_col, 1, zz.MEMBERS[memPtr][3], zz.MEMBERS[memPtr][4], 5, \
+                                 zz.MEMBERS[memPtr][7], zz.MEMBERS[memPtr][8]]) # set blink to 5 sec
+                              zz.TEAMS[team_unas][3] = zz.TEAMS[team_unas][3] + 1  ## set number of searchers in unassigned
+                              rows[irow-1][11] = "OnTcard"
+                          elif (row[11] == "OnTcard" or row[11] == "RmTcard"):  ## Already Signed-In and on Tcard
+                              pass    # just continue on
+                          else:
+                              print("Unexpected changes in record: %s"% row)
+                              winsound.Beep(2500, 300)
+                  else:
+                      print("New entry")
+                      ## should be for new sign_in only, so only time-in set and status s/b set as SignIn
+                      print('stat :%s:'%row[11])
+                      if (row[11][0:6] == "SignIn"):
+                          ## check resources row[3] for LD and MED and set logic 0 or 1
+                          lead = row[3].find("LD") > 0
+                          med = row[3].find("MED") > 0
+                          rownu = [row[1], row[0], row[2], lead, med, row[7], row[8], row[10],row[3], row[9]] # watch for numeric vs string
+                          zz.MEMBERS.append(rownu)
+                          #### create SRCHR entry
+                          ## find vacancy in UNAS_USED
+                          for ixx in range(2,len(zz.UNAS_USED)):
+                              if ((ixx % yy.Nrows) == 0): continue   ## skip all rows == 0
+                              if (zz.UNAS_USED[ixx] == 0):           ## found available location
+                                  zz.UNAS_USED[ixx] = 1
+                                  break         
+                          colu = int(ixx/yy.Nrows)
+                          rowu = ixx - colu * yy.Nrows
+                          colu = colu + yy.Nunas_col
+                          zz.SRCHR.insert(-1,[row[1], row[2], row[0], colu, rowu, yy.Nunas_col, 1, str(lead), \
+                                          str(med), 5, row[10], row[3]]) # set blink to 5 sec
+                          zz.TEAMS[team_unas][3] = zz.TEAMS[team_unas][3] + 1  ## set number of searchers in unassigned
+                          rows[irow-1][11] = "OnTcard"
+                      else:
+                          print("Unexpected Status: %s"%row)
+                          winsound.Beep(2500, 300)
+                          
+            print('prior to tmp open')
+            with open(server + 'remote_tmp.csv', 'w+', newline='') as csvOUT:      ##  create a tmp updated interface file
+                csvPtr = csv.writer(csvOUT, dialect='excel', skipinitialspace=True)            
+                csvPtr.writerows(rows)
+                
+            print('opened and wrote tmp file')
+            os.remove(server + 'REMOTE_SIGN_IN.csv')     ## remove pre-existing file
+            os.rename(server + 'remote_tmp.csv', server + 'REMOTE_SIGN_IN.csv')  ## put tmp file into normal file
+            os.remove(server + 'rmt_lock_' + cname + '#' + strCurT)    ## remove lock file
+            print('changed files')
+            yy.saveLastIDentry = yy.sarID.text()
+            yy.sarID.setText("")  ## clear sarID field
+            if (DEBUG == 1): print("PTR2 %s"%yy)
+            zz.masterBlink = 10      ## set time for blinker to run until restarted 10 * 0.5 = 5sec
+            zz.time_chk()            ## start blinker clock
+            ##print("SRCHR chk: %s"%zz.SRCHR)
+            zz.tabload(yy,0)
+            
+            ## At end save current input to priorRead
+            ## print("Rows: %s"% rows)
+            self.priorRead = rows
+            ##print("PriorRead: %s"% self.priorRead)
 
 
     def numbers(self,n):  ## take the number buttons and fill SAR ID field
@@ -639,7 +814,7 @@ class TableApp(QtWidgets.QMainWindow, QtWidgets.QTableWidget, v1.Ui_MainWindow, 
                        memPtr = xx
                        break               
                zz.MEMBERS[memPtr][6] = TimeOUT         ##  set as checked-out (AT some point want to add total time field
-               zz.MEMBERS[memPtr][9] = zz.MEMBERS[memPtr][9] + zz.MEMBERS[memPtr][6] - zz.MEMBERS[memPtr][5]  ## cum time
+               zz.MEMBERS[memPtr][9] = float(zz.MEMBERS[memPtr][9]) + zz.MEMBERS[memPtr][6] - float(zz.MEMBERS[memPtr][5])  ## cum time
                zz.MEMBERS[memPtr][5] = -1              ## reset for next checkin               
                rowy = zz.SRCHR[ptr][4]
                colx = zz.SRCHR[ptr][3]
